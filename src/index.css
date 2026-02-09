@@ -1,0 +1,312 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Balaji Heart Center Design System - Logo Colors */
+/* Dark Blue (#1a365d) and Red (#a63d40) with White Bold Fonts */
+
+@layer base {
+  :root {
+    /* Core backgrounds */
+    --background: 0 0% 100%;
+    --foreground: 210 50% 15%;
+
+    /* Cards and surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 210 50% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 50% 15%;
+
+    /* Primary - Dark Blue from branding */
+    --primary: 215 60% 25%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Soft gray surface */
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 210 50% 15%;
+
+    /* Muted elements */
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 15% 45%;
+
+    /* Accent - Red from logo heart */
+    --accent: 358 55% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive/Action - Medical red */
+    --destructive: 358 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success - Soft green for confirmations */
+    --success: 142 50% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 215 60% 25%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - matches primary theme */
+    --sidebar-background: 215 60% 25%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 215 60% 25%;
+    --sidebar-accent: 215 60% 30%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 60% 30%;
+    --sidebar-ring: 0 0% 100%;
+
+    /* Custom medical tokens */
+    --medical-blue: 215 60% 25%;
+    --medical-red: 358 55% 45%;
+    --medical-teal: 180 50% 35%;
+    --medical-light-blue: 210 60% 95%;
+    --medical-gray: 210 20% 96%;
+  }
+
+  .dark {
+    --background: 215 30% 10%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 30% 13%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 30% 13%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 215 60% 55%;
+    --primary-foreground: 215 30% 10%;
+
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 95%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 210 15% 60%;
+
+    --accent: 358 60% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 358 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 50% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 22%;
+    --ring: 215 60% 55%;
+
+    --sidebar-background: 215 30% 8%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 215 60% 55%;
+    --sidebar-primary-foreground: 215 30% 10%;
+    --sidebar-accent: 215 30% 15%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 215 25% 18%;
+    --sidebar-ring: 215 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Large readable fonts for clinic use */
+  h1 {
+    @apply text-2xl md:text-3xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-lg md:text-xl font-semibold;
+  }
+
+  /* Improve form readability */
+  label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  input, select, textarea {
+    @apply text-base;
+  }
+}
+
+@layer components {
+  /* Medical card styling */
+  .medical-card {
+    @apply bg-card rounded-lg border border-border shadow-sm;
+  }
+
+  /* Section container with gray background */
+  .medical-section {
+    @apply bg-secondary rounded-lg p-4 md:p-6;
+  }
+
+  /* Status badges */
+  .status-waiting {
+    @apply bg-warning/20 text-warning border border-warning/30 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .status-completed {
+    @apply bg-success/20 text-success border border-success/30 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .status-in-progress {
+    @apply bg-primary/20 text-primary border border-primary/30 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  /* Tab navigation styling */
+  .tab-nav {
+    @apply flex flex-wrap gap-2 bg-secondary rounded-lg p-2;
+  }
+
+  .tab-item {
+    @apply flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200;
+  }
+
+  .tab-item-active {
+    @apply bg-primary text-primary-foreground shadow-sm;
+  }
+
+  .tab-item-inactive {
+    @apply text-muted-foreground hover:bg-background hover:text-foreground;
+  }
+
+  /* Form section styling */
+  .form-section {
+    @apply space-y-4 p-4 md:p-6 bg-card rounded-lg border border-border;
+  }
+
+  .form-section-title {
+    @apply flex items-center gap-2 text-lg font-semibold text-primary mb-4;
+  }
+
+  /* Large touch-friendly buttons with hover effects */
+  .btn-touch {
+    @apply h-14 px-8 text-lg font-bold rounded-lg shadow-md transition-all duration-200 active:scale-95 hover:shadow-lg hover:scale-[1.02];
+  }
+
+  .btn-primary-touch {
+    @apply btn-touch bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+
+  .btn-accent-touch {
+    @apply btn-touch bg-accent text-accent-foreground hover:bg-accent/90;
+  }
+
+  .btn-success-touch {
+    @apply btn-touch bg-success text-success-foreground hover:bg-success/90;
+  }
+
+  /* Enhanced table styling */
+  .table-header-cell {
+    @apply bg-primary text-primary-foreground font-bold text-sm uppercase tracking-wide;
+  }
+
+  /* Enhanced table hover effect */
+  .table-row-hover:hover {
+    @apply bg-primary/5 transition-colors duration-150;
+  }
+
+  /* Auto-expanding textarea */
+  .auto-textarea {
+    @apply min-h-[60px] resize-none overflow-hidden transition-all;
+  }
+
+  /* Print styles */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    
+    body {
+      background: white !important;
+    }
+    
+    .print-container {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+
+  /* High contrast for TV display */
+  .tv-display {
+    @apply bg-slate-900 text-white;
+  }
+
+  .tv-display .card {
+    @apply bg-slate-800 border-slate-600;
+  }
+
+  /* Now Serving Banner */
+  .now-serving-banner {
+    @apply fixed top-16 left-0 right-0 z-50 bg-gradient-to-r from-primary via-primary/95 to-accent text-primary-foreground py-4 px-6 shadow-lg animate-fade-in;
+  }
+}
+
+/* Keyframe animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(var(--accent));
+  }
+  50% {
+    box-shadow: 0 0 20px hsl(var(--accent)), 0 0 30px hsl(var(--accent) / 0.5);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* TV Display button blink animation */
+@keyframes blink-tv {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px #b23438;
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 20px #b23438, 0 0 30px #b23438;
+  }
+}
+
+.animate-blink-tv {
+  animation: blink-tv 1s ease-in-out infinite;
+  background-color: #b23438 !important;
+  border-color: #b23438 !important;
+  color: white !important;
+}
