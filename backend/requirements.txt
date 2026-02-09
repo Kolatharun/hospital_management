@@ -27,7 +27,12 @@ python-dateutil>=2.8.2,<3.0.0
 # Environment
 python-dotenv>=1.0.0,<2.0.0
 
+# PDF Generation (for bill receipts)
+xhtml2pdf>=0.2.11,<1.0.0
+
+# HTTP Client (for WhatsApp API and testing)
+httpx>=0.26.0,<1.0.0
+
 # Testing (optional)
 pytest>=8.0.0,<9.0.0
 pytest-asyncio>=0.23.0,<1.0.0
-httpx>=0.26.0,<1.0.0

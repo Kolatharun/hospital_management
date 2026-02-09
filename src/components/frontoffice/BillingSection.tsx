@@ -829,12 +829,15 @@ export function BillingSection() {
     const consultationFee = Number(bill.consultationFee) || 0;
     const labItems = bill.labItems || [];
     const labTotal = labItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const otherChargesText = bill.otherCharges || '';
+    const otherChargesNums = otherChargesText.match(/\d+/g);
+    const otherChargesTotal = otherChargesNums ? otherChargesNums.reduce((sum, n) => sum + parseInt(n), 0) : 0;
     const totalAmount = Number(bill.totalAmount) || 0;
     const paidAmount = Number(bill.paidAmount) || 0;
     const dueAmount = Number(bill.dueAmount) || 0;
     const discount = Number(bill.discount) || 0;
     const discountPercent = Number(bill.discountPercent) || 0;
-    const preDiscountTotal = consultationFee + labTotal;
+    const preDiscountTotal = consultationFee + labTotal + otherChargesTotal;
     const paymentMethod = bill.paymentMethod || 'cash';
 
     // Use base64 logo if available
@@ -869,6 +872,19 @@ export function BillingSection() {
         '</tr>'
       );
     });
+
+    // Add other charges as a line item
+    if (otherChargesTotal > 0) {
+      lineItemsRows.push(
+        '<tr>' +
+        '<td>' + slNo++ + '</td>' +
+        '<td>Other Charges' + (otherChargesText ? ' (' + otherChargesText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + ')' : '') + '</td>' +
+        '<td style="text-align: center;">1</td>' +
+        '<td style="text-align: right;">₹ ' + formatAmount(otherChargesTotal) + '</td>' +
+        '<td style="text-align: right;">₹ ' + formatAmount(otherChargesTotal) + '</td>' +
+        '</tr>'
+      );
+    }
 
     const lineItemsHtml = lineItemsRows.join('');
 
@@ -976,6 +992,7 @@ export function BillingSection() {
       '<div class="payment-right">' +
       '<p>Consultation: ₹ ' + formatAmount(consultationFee) + '</p>' +
       '<p>Lab Total: ₹ ' + formatAmount(labTotal) + '</p>' +
+      (otherChargesTotal > 0 ? '<p>Other Charges: ₹ ' + formatAmount(otherChargesTotal) + '</p>' : '') +
       '<p class="total-row">TOTAL AMOUNT : ₹ ' + formatAmount(preDiscountTotal) + '</p>' +
       discountRow +
       '<p style="font-size: 16px; font-weight: bold; color: #0d7377;">NET AMOUNT : ₹ ' + formatAmount(totalAmount) + '</p>' +

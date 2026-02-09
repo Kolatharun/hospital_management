@@ -164,6 +164,19 @@ export const billingService = {
     const queryString = queryParams.toString();
     return api.get<Bill[]>(`/billing/search${queryString ? `?${queryString}` : ''}`);
   },
+
+  async sendEmail(billId: string, email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/billing/${billId}/send-email`, { email });
+  },
+
+  async sendWhatsApp(billId: string, phone?: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/billing/${billId}/send-whatsapp`, { phone: phone || null });
+  },
+
+  getReceiptPdfUrl(billId: string): string {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    return `${baseUrl}/billing/${billId}/receipt-pdf`;
+  },
 };
 
 export default billingService;

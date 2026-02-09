@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Calendar, Printer, MessageSquare, Mail, Eye, Send, Search } from 'lucide-react';
+import { FileText, Calendar, Printer, MessageSquare, Mail, Eye, Send, Search, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import logo from '@/assets/logo.jpeg';
 
@@ -85,6 +85,7 @@ export function BillsList() {
   const [viewBill, setViewBill] = useState<Bill | null>(null);
   const [shareDialog, setShareDialog] = useState<{ bill: Bill; type: 'whatsapp' | 'email' } | null>(null);
   const [emailAddress, setEmailAddress] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   // Store logo as base64 for print window
   const logoBase64Ref = useRef<string>('');
@@ -210,12 +211,15 @@ export function BillsList() {
     const consultationFee = Number(bill.consultationFee) || 0;
     const labTotal = Number(bill.labTotal) || 0;
     const labItems = bill.labItems || [];
+    const otherChargesText = bill.otherCharges || '';
+    const otherChargesNums = otherChargesText.match(/\d+/g);
+    const otherChargesTotal = otherChargesNums ? otherChargesNums.reduce((sum: number, n: string) => sum + parseInt(n), 0) : 0;
     const totalAmount = Number(bill.totalAmount) || 0;
     const paidAmount = Number(bill.paidAmount) || 0;
     const dueAmount = Number(bill.dueAmount) || 0;
     const discountAmount = Number(bill.discountAmount) || 0;
     const discountPercent = Number(bill.discountPercent) || 0;
-    const preDiscountTotal = consultationFee + labTotal;
+    const preDiscountTotal = consultationFee + labTotal + otherChargesTotal;
     const paymentMethod = bill.paymentMethod || 'cash';
 
     // Build line items rows
@@ -247,6 +251,19 @@ export function BillsList() {
         '</tr>'
       );
     });
+
+    // Add other charges as a line item
+    if (otherChargesTotal > 0) {
+      lineItemsRows.push(
+        '<tr>' +
+        '<td>' + slNo++ + '</td>' +
+        '<td>Other Charges' + (otherChargesText ? ' (' + otherChargesText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + ')' : '') + '</td>' +
+        '<td style="text-align: center;">1</td>' +
+        '<td style="text-align: right;">₹ ' + formatAmount(otherChargesTotal) + '</td>' +
+        '<td style="text-align: right;">₹ ' + formatAmount(otherChargesTotal) + '</td>' +
+        '</tr>'
+      );
+    }
 
     const lineItemsHtml = lineItemsRows.join('');
 
@@ -350,6 +367,7 @@ export function BillsList() {
       '<div class="payment-right">' +
       '<p>Consultation: ₹ ' + formatAmount(consultationFee) + '</p>' +
       '<p>Lab Total: ₹ ' + formatAmount(labTotal) + '</p>' +
+      (otherChargesTotal > 0 ? '<p>Other Charges: ₹ ' + formatAmount(otherChargesTotal) + '</p>' : '') +
       '<p class="total-row">TOTAL AMOUNT: ₹ ' + formatAmount(preDiscountTotal) + '</p>' +
       discountRow +
       '<p style="font-size: 16px; font-weight: bold; color: #0d7377;">NET AMOUNT: ₹ ' + formatAmount(totalAmount) + '</p>' +
@@ -408,31 +426,28 @@ export function BillsList() {
     }
   };
 
-  const handleWhatsAppShare = (bill: Bill) => {
-    const message = encodeURIComponent(
-      `*Balaji Heart Center - Bill Receipt*\n\n` +
-      `Bill No: ${bill.billNumber}\n` +
-      `Date: ${format(new Date(bill.createdAt), 'dd-MM-yyyy')}\n` +
-      `Patient: ${bill.patientName}\n` +
-      `MR No: ${bill.mrNumber}\n\n` +
-      `Total Amount: ₹${bill.totalAmount}\n` +
-      `Paid Amount: ₹${bill.paidAmount}\n` +
-      `Due Amount: ₹${bill.dueAmount}\n\n` +
-      `Thank you for visiting Balaji Heart Center!\n` +
-      `Contact: +91 9100079990`
-    );
-    
-    const phoneNumber = bill.mobileNo.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
-    
-    toast({
-      title: 'WhatsApp Opened',
-      description: 'Bill details sent to WhatsApp.',
-    });
-    setShareDialog(null);
+  const handleWhatsAppShare = async (bill: Bill) => {
+    setIsSending(true);
+    try {
+      await billingService.sendWhatsApp(bill.id, bill.mobileNo || undefined);
+      toast({
+        title: 'WhatsApp Sent',
+        description: 'Bill receipt PDF sent successfully via WhatsApp.',
+      });
+      setShareDialog(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send WhatsApp';
+      toast({
+        title: 'WhatsApp Error',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleEmailShare = (bill: Bill) => {
+  const handleEmailShare = async (bill: Bill) => {
     if (!emailAddress) {
       toast({
         title: 'Error',
@@ -442,28 +457,25 @@ export function BillsList() {
       return;
     }
 
-    const subject = encodeURIComponent(`Balaji Heart Center - Bill Receipt ${bill.billNumber}`);
-    const body = encodeURIComponent(
-      `Balaji Heart Center - Bill Receipt\n\n` +
-      `Bill No: ${bill.billNumber}\n` +
-      `Date: ${format(new Date(bill.createdAt), 'dd-MM-yyyy')}\n` +
-      `Patient: ${bill.patientName}\n` +
-      `MR No: ${bill.mrNumber}\n\n` +
-      `Total Amount: ₹${bill.totalAmount}\n` +
-      `Paid Amount: ₹${bill.paidAmount}\n` +
-      `Due Amount: ₹${bill.dueAmount}\n\n` +
-      `Thank you for visiting Balaji Heart Center!\n` +
-      `Contact: +91 9100079990 | Email: balajiheartcenter.hyd@gmail.com`
-    );
-    
-    window.open(`mailto:${emailAddress}?subject=${subject}&body=${body}`, '_blank');
-    
-    toast({
-      title: 'Email Client Opened',
-      description: 'Bill details ready to send.',
-    });
-    setShareDialog(null);
-    setEmailAddress('');
+    setIsSending(true);
+    try {
+      await billingService.sendEmail(bill.id, emailAddress);
+      toast({
+        title: 'Email Sent',
+        description: `Bill receipt PDF sent successfully to ${emailAddress}.`,
+      });
+      setShareDialog(null);
+      setEmailAddress('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send email';
+      toast({
+        title: 'Email Error',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -706,8 +718,8 @@ export function BillsList() {
                   <Printer className="w-4 h-4" />
                   Print
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setViewBill(null);
                     setShareDialog({ bill: viewBill, type: 'whatsapp' });
@@ -716,6 +728,17 @@ export function BillsList() {
                 >
                   <MessageSquare className="w-4 h-4" />
                   WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewBill(null);
+                    setShareDialog({ bill: viewBill, type: 'email' });
+                  }}
+                  className="gap-2 font-bold"
+                >
+                  <Mail className="w-4 h-4" />
+                  Email
                 </Button>
               </div>
             </div>
@@ -756,14 +779,23 @@ export function BillsList() {
               )}
 
               <Button
-                onClick={() => shareDialog.type === 'whatsapp' 
+                onClick={() => shareDialog.type === 'whatsapp'
                   ? handleWhatsAppShare(shareDialog.bill)
                   : handleEmailShare(shareDialog.bill)
                 }
                 className="w-full gap-2 font-bold"
+                disabled={isSending}
               >
-                <Send className="w-4 h-4" />
-                {shareDialog.type === 'whatsapp' ? 'Open WhatsApp' : 'Send Email'}
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {isSending
+                  ? 'Sending...'
+                  : shareDialog.type === 'whatsapp'
+                    ? 'Send via WhatsApp'
+                    : 'Send Email'}
               </Button>
             </div>
           )}

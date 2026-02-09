@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     # CORS - Frontend runs on Vite default port (also allow common dev ports)
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:8081,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4173,http://127.0.0.1:3000"
 
+    # Email (SMTP) - for sending bill receipts
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+
+    # WhatsApp Business Cloud API - for sending bill receipts
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    WHATSAPP_ACCESS_TOKEN: str = ""
+
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000

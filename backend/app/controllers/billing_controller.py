@@ -2,11 +2,13 @@
 Billing Controller - Bill management and payment endpoints
 """
 
+import os
 from typing import Optional
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Body, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -161,3 +163,122 @@ def update_bill(
     service = BillingService(db)
     bill = service.update_bill(bill_id, data)
     return service.build_response(bill)
+
+
+@router.get("/{bill_id}/receipt-pdf")
+def download_receipt_pdf(
+    bill_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate and download bill receipt as PDF."""
+    from app.utils.receipt_generator import generate_receipt_pdf
+    from app.utils.notification_service import cleanup_temp_file
+
+    service = BillingService(db)
+    bill = service.get_bill(bill_id)
+
+    try:
+        pdf_path = generate_receipt_pdf(bill)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
+        )
+
+    # Schedule cleanup after response is sent
+    background_tasks.add_task(cleanup_temp_file, pdf_path)
+
+    filename = f"Receipt_{bill.bill_number}.pdf"
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/{bill_id}/send-email")
+def send_receipt_email(
+    bill_id: UUID,
+    email: str = Body(..., embed=True, description="Recipient email address"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE])),
+):
+    """Generate bill receipt PDF and send via email."""
+    from app.utils.receipt_generator import generate_receipt_pdf
+    from app.utils.notification_service import send_email_with_receipt, cleanup_temp_file
+
+    service = BillingService(db)
+    bill = service.get_bill(bill_id)
+    pdf_path = None
+
+    try:
+        pdf_path = generate_receipt_pdf(bill)
+        send_email_with_receipt(
+            to_email=email,
+            patient_name=bill.patient_name,
+            bill_number=bill.bill_number,
+            pdf_path=pdf_path,
+        )
+        return {"message": f"Receipt sent successfully to {email}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email: {str(e)}",
+        )
+    finally:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
+
+
+@router.post("/{bill_id}/send-whatsapp")
+def send_receipt_whatsapp(
+    bill_id: UUID,
+    phone: Optional[str] = Body(None, embed=True, description="Override phone number"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE])),
+):
+    """Generate bill receipt PDF and send via WhatsApp."""
+    from app.utils.receipt_generator import generate_receipt_pdf
+    from app.utils.notification_service import send_whatsapp_with_receipt, cleanup_temp_file
+
+    service = BillingService(db)
+    bill = service.get_bill(bill_id)
+
+    phone_number = phone or bill.mobile_no
+    if not phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No phone number available for this patient",
+        )
+
+    pdf_path = None
+    try:
+        pdf_path = generate_receipt_pdf(bill)
+        send_whatsapp_with_receipt(
+            phone_number=phone_number,
+            patient_name=bill.patient_name,
+            bill_number=bill.bill_number,
+            pdf_path=pdf_path,
+        )
+        return {"message": f"Receipt sent successfully via WhatsApp to {phone_number}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send WhatsApp: {str(e)}",
+        )
+    finally:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
