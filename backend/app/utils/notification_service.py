@@ -155,6 +155,132 @@ def send_whatsapp_with_receipt(
     return True
 
 
+def send_email_with_day_summary(
+    to_email: str,
+    summary_date: str,
+    pdf_path: str,
+) -> bool:
+    """Send day payment summary PDF via email using SMTP.
+
+    Returns True on success, raises on failure.
+    """
+    if not settings.SMTP_HOST or not settings.SMTP_USER:
+        raise ValueError(
+            "Email not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, "
+            "SMTP_PASSWORD in environment variables."
+        )
+
+    msg = MIMEMultipart()
+    msg["From"] = settings.SMTP_FROM or settings.SMTP_USER
+    msg["To"] = to_email
+    msg["Subject"] = f"Balaji Heart Center - Day Payments Summary - {summary_date}"
+
+    body = (
+        f"Dear Team,\n\n"
+        f"Please find attached the Day Payments Summary for {summary_date} "
+        f"from Balaji Heart Center.\n\n"
+        f"Thank you!\n"
+        f"Balaji Heart Center\n"
+        f"Ph: +91 9100079990 | www.balajiheartcenter.com"
+    )
+    msg.attach(MIMEText(body, "plain"))
+
+    filename = f"Day_Summary_{summary_date}.pdf"
+    with open(pdf_path, "rb") as f:
+        pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
+        pdf_attachment.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(pdf_attachment)
+
+    try:
+        if settings.SMTP_USE_TLS:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            server.starttls()
+        else:
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"Day summary email sent to {to_email} for {summary_date}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send day summary email to {to_email}: {e}")
+        raise
+
+
+def send_whatsapp_with_day_summary(
+    phone_number: str,
+    summary_date: str,
+    pdf_path: str,
+) -> bool:
+    """Send day payment summary PDF via WhatsApp Business Cloud API.
+
+    Returns True on success, raises on failure.
+    """
+    if not settings.WHATSAPP_PHONE_NUMBER_ID or not settings.WHATSAPP_ACCESS_TOKEN:
+        raise ValueError(
+            "WhatsApp not configured. Set WHATSAPP_PHONE_NUMBER_ID and "
+            "WHATSAPP_ACCESS_TOKEN in environment variables."
+        )
+
+    clean_phone = phone_number.replace(" ", "").replace("-", "").replace("+", "")
+    if clean_phone.startswith("0"):
+        clean_phone = "91" + clean_phone[1:]
+    elif not clean_phone.startswith("91"):
+        clean_phone = "91" + clean_phone
+
+    api_url = f"https://graph.facebook.com/v21.0/{settings.WHATSAPP_PHONE_NUMBER_ID}"
+    headers = {
+        "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
+    }
+
+    filename = f"Day_Summary_{summary_date}.pdf"
+    with open(pdf_path, "rb") as f:
+        upload_response = httpx.post(
+            f"{api_url}/media",
+            headers=headers,
+            files={"file": (filename, f, "application/pdf")},
+            data={"messaging_product": "whatsapp"},
+            timeout=30,
+        )
+
+    if upload_response.status_code != 200:
+        logger.error(f"WhatsApp media upload failed: {upload_response.text}")
+        raise RuntimeError(f"WhatsApp media upload failed: {upload_response.text}")
+
+    media_id = upload_response.json().get("id")
+    if not media_id:
+        raise RuntimeError("WhatsApp media upload returned no media ID")
+
+    message_payload = {
+        "messaging_product": "whatsapp",
+        "to": clean_phone,
+        "type": "document",
+        "document": {
+            "id": media_id,
+            "filename": filename,
+            "caption": (
+                f"Day Payments Summary - {summary_date}\n"
+                f"From Balaji Heart Center"
+            ),
+        },
+    }
+
+    send_response = httpx.post(
+        f"{api_url}/messages",
+        headers={**headers, "Content-Type": "application/json"},
+        json=message_payload,
+        timeout=30,
+    )
+
+    if send_response.status_code not in (200, 201):
+        logger.error(f"WhatsApp message send failed: {send_response.text}")
+        raise RuntimeError(f"WhatsApp message send failed: {send_response.text}")
+
+    logger.info(f"WhatsApp day summary sent to {clean_phone} for {summary_date}")
+    return True
+
+
 def cleanup_temp_file(file_path: str) -> None:
     """Delete a temporary file if it exists."""
     try:

@@ -22,6 +22,7 @@ interface Bill {
   patientName: string;
   mrNumber: string;
   mobileNo: string;
+  patientEmail: string;
   doctorName: string;
   consultationFee: number;
   labItems: LabItem[];
@@ -59,6 +60,7 @@ function mapApiBillToBill(apiBill: ApiBill): Bill {
     patientName: apiBill.patient_name,
     mrNumber: apiBill.uhid || '',
     mobileNo: apiBill.mobile_no || '',
+    patientEmail: apiBill.patient_email || '',
     doctorName: apiBill.doctor_name || '',
     consultationFee: apiBill.consultation_fee || 0,
     labItems,
@@ -85,6 +87,7 @@ export function BillsList() {
   const [viewBill, setViewBill] = useState<Bill | null>(null);
   const [shareDialog, setShareDialog] = useState<{ bill: Bill; type: 'whatsapp' | 'email' } | null>(null);
   const [emailAddress, setEmailAddress] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [isSending, setIsSending] = useState(false);
 
   // Store logo as base64 for print window
@@ -427,14 +430,24 @@ export function BillsList() {
   };
 
   const handleWhatsAppShare = async (bill: Bill) => {
+    if (!phoneNumber) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a phone number.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
-      await billingService.sendWhatsApp(bill.id, bill.mobileNo || undefined);
+      await billingService.sendWhatsApp(bill.id, phoneNumber);
       toast({
         title: 'WhatsApp Sent',
         description: 'Bill receipt PDF sent successfully via WhatsApp.',
       });
       setShareDialog(null);
+      setPhoneNumber('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to send WhatsApp';
       toast({
@@ -637,7 +650,7 @@ export function BillsList() {
                             size="sm"
                             variant="ghost"
                             className="text-success hover:text-success hover:bg-success/10"
-                            onClick={() => setShareDialog({ bill, type: 'whatsapp' })}
+                            onClick={() => { setPhoneNumber(bill.mobileNo); setShareDialog({ bill, type: 'whatsapp' }); }}
                             title="WhatsApp"
                           >
                             <MessageSquare className="w-4 h-4" />
@@ -646,7 +659,7 @@ export function BillsList() {
                             size="sm"
                             variant="ghost"
                             className="text-primary hover:text-primary hover:bg-primary/10"
-                            onClick={() => setShareDialog({ bill, type: 'email' })}
+                            onClick={() => { setEmailAddress(bill.patientEmail); setShareDialog({ bill, type: 'email' }); }}
                             title="Email"
                           >
                             <Mail className="w-4 h-4" />
@@ -721,6 +734,7 @@ export function BillsList() {
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setPhoneNumber(viewBill.mobileNo);
                     setViewBill(null);
                     setShareDialog({ bill: viewBill, type: 'whatsapp' });
                   }}
@@ -732,6 +746,7 @@ export function BillsList() {
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setEmailAddress(viewBill.patientEmail);
                     setViewBill(null);
                     setShareDialog({ bill: viewBill, type: 'email' });
                   }}
@@ -747,7 +762,7 @@ export function BillsList() {
       </Dialog>
 
       {/* Share Dialog */}
-      <Dialog open={!!shareDialog} onOpenChange={() => { setShareDialog(null); setEmailAddress(''); }}>
+      <Dialog open={!!shareDialog} onOpenChange={() => { setShareDialog(null); setEmailAddress(''); setPhoneNumber(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -765,6 +780,18 @@ export function BillsList() {
                   {shareDialog.bill.billNumber} • ₹{shareDialog.bill.totalAmount}
                 </p>
               </div>
+
+              {shareDialog.type === 'whatsapp' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone Number</label>
+                  <Input
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+              )}
 
               {shareDialog.type === 'email' && (
                 <div className="space-y-2">

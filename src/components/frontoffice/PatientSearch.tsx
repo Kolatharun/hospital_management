@@ -13,6 +13,14 @@ import { appointmentService, Appointment } from '@/services/appointmentService';
 import { documentService, Document } from '@/services/documentService';
 import { prescriptionService, Prescription } from '@/services/prescriptionService';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+const getDocumentFileUrl = (documentId: string): string => {
+  if (!documentId) return '';
+  const token = localStorage.getItem('access_token');
+  return `${API_BASE_URL}/documents/${documentId}/file${token ? `?token=${token}` : ''}`;
+};
+
 export function PatientSearch() {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
@@ -29,6 +37,7 @@ export function PatientSearch() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [prescriptionPreview, setPrescriptionPreview] = useState<Prescription | null>(null);
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -107,12 +116,102 @@ export function PatientSearch() {
     setDocumentPreview(doc);
   };
 
-  const handleDownloadPrescription = (prescriptionId: string) => {
-    console.log('Downloading prescription:', prescriptionId);
-    toast({
-      title: 'Download Started',
-      description: 'Prescription download will begin shortly.',
-    });
+  const handleDownloadDocument = (doc: Document) => {
+    const url = getDocumentFileUrl(doc.id);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = doc.file_name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleViewPrescription = (rx: Prescription) => {
+    setPrescriptionPreview(rx);
+  };
+
+  const handleDownloadPrescription = (rx: Prescription) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: 'Popup Blocked',
+        description: 'Please allow popups to download prescriptions.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const medicinesRows = rx.medicines?.map((med, idx) =>
+      `<tr>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center">${idx + 1}</td>
+        <td style="padding:8px;border:1px solid #ddd">${med.medicine_name}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.dosage || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.frequency || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.duration || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd">${med.instructions || '-'}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="6" style="padding:8px;text-align:center">No medicines</td></tr>';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Prescription - ${rx.patient_name || 'Patient'}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+          .header { text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 16px; margin-bottom: 20px; }
+          .header h1 { color: #1a365d; margin: 0; }
+          .patient-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; padding: 12px; background: #f7fafc; border-radius: 8px; }
+          .patient-info div { font-size: 14px; }
+          .label { color: #718096; }
+          .value { font-weight: 600; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #1a365d; color: white; padding: 10px 8px; text-align: left; }
+          .section { margin-bottom: 16px; }
+          .section-title { font-weight: 600; color: #1a365d; margin-bottom: 4px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Balaji Heart Center</h1>
+          <p>Prescription</p>
+        </div>
+        <div class="patient-info">
+          <div><span class="label">Patient: </span><span class="value">${rx.patient_name || '-'}</span></div>
+          <div><span class="label">MR Number: </span><span class="value">${rx.patient_mr_number || '-'}</span></div>
+          <div><span class="label">Age/Gender: </span><span class="value">${rx.patient_age_gender || '-'}</span></div>
+          <div><span class="label">Date: </span><span class="value">${formatDate(rx.created_at)}</span></div>
+          <div><span class="label">Doctor: </span><span class="value">${rx.doctor_name || '-'}</span></div>
+          <div><span class="label">OP Number: </span><span class="value">${rx.op_number || '-'}</span></div>
+        </div>
+        ${rx.diagnosis ? `<div class="section"><div class="section-title">Diagnosis</div><p>${rx.diagnosis}</p></div>` : ''}
+        ${rx.complaint ? `<div class="section"><div class="section-title">Complaint</div><p>${rx.complaint}</p></div>` : ''}
+        ${rx.history ? `<div class="section"><div class="section-title">History</div><p>${rx.history}</p></div>` : ''}
+        <div class="section">
+          <div class="section-title">Medicines</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px">#</th>
+                <th>Medicine</th>
+                <th style="width:80px">Dosage</th>
+                <th style="width:80px">Frequency</th>
+                <th style="width:80px">Duration</th>
+                <th>Instructions</th>
+              </tr>
+            </thead>
+            <tbody>${medicinesRows}</tbody>
+          </table>
+        </div>
+        ${rx.lab_tests ? `<div class="section"><div class="section-title">Lab Tests</div><p>${rx.lab_tests}</p></div>` : ''}
+        ${rx.advice ? `<div class="section"><div class="section-title">Advice</div><p>${rx.advice}</p></div>` : ''}
+        ${rx.follow_up_days ? `<div class="section"><div class="section-title">Follow Up</div><p>After ${rx.follow_up_days} days</p></div>` : ''}
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -351,6 +450,7 @@ export function PatientSearch() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => handleDownloadDocument(doc)}
                                 className="gap-1 font-bold"
                               >
                                 <Download className="w-4 h-4" />
@@ -386,6 +486,7 @@ export function PatientSearch() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    onClick={() => handleViewPrescription(rx)}
                                     className="gap-1 font-bold"
                                   >
                                     <Eye className="w-4 h-4" />
@@ -394,7 +495,7 @@ export function PatientSearch() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDownloadPrescription(rx.id)}
+                                    onClick={() => handleDownloadPrescription(rx)}
                                     className="gap-1 font-bold"
                                   >
                                     <Download className="w-4 h-4" />
@@ -481,26 +582,194 @@ export function PatientSearch() {
               </span>
             </DialogTitle>
           </DialogHeader>
-          <div className="min-h-[400px] bg-muted rounded-lg flex items-center justify-center">
-            {documentPreview?.file_type?.startsWith('image') ? (
-              <img
-                src={documentPreview.file_path}
-                alt={documentPreview.file_name}
-                className="max-w-full max-h-96 object-contain"
-              />
-            ) : (
-              <p className="text-muted-foreground">Document preview not available</p>
-            )}
-          </div>
+          {documentPreview && (
+            <div className="min-h-[400px] bg-muted rounded-lg overflow-hidden">
+              {documentPreview.file_type?.startsWith('image') ? (
+                <img
+                  src={getDocumentFileUrl(documentPreview.id)}
+                  alt={documentPreview.file_name}
+                  className="w-full max-h-[500px] object-contain"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.innerHTML = `
+                      <div style="display:flex;align-items:center;justify-content:center;min-height:400px;color:var(--muted-foreground)">
+                        <div style="text-align:center">
+                          <p>Unable to load image preview.</p>
+                          <p style="font-size:0.875rem;margin-top:4px">The file may have been moved or deleted.</p>
+                        </div>
+                      </div>
+                    `;
+                  }}
+                />
+              ) : documentPreview.file_type === 'application/pdf' ? (
+                <iframe
+                  src={getDocumentFileUrl(documentPreview.id)}
+                  title={documentPreview.file_name}
+                  className="w-full h-[500px]"
+                />
+              ) : (
+                <div className="flex items-center justify-center min-h-[400px]">
+                  <div className="text-center text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-2" />
+                    <p>Preview not available for this file type</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDocumentPreview(null)} className="font-bold">
               Close
             </Button>
-            <Button className="gap-2 font-bold">
-              <Download className="w-4 h-4" />
-              Download
-            </Button>
+            {documentPreview && (
+              <Button
+                onClick={() => handleDownloadDocument(documentPreview)}
+                className="gap-2 font-bold"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+            )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Prescription Preview Dialog */}
+      <Dialog open={!!prescriptionPreview} onOpenChange={() => setPrescriptionPreview(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pill className="w-5 h-5" />
+              Prescription Details
+            </DialogTitle>
+          </DialogHeader>
+          {prescriptionPreview && (
+            <div className="space-y-4">
+              {/* Patient & Doctor Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-secondary rounded-lg">
+                <div>
+                  <p className="text-xs text-muted-foreground">Patient</p>
+                  <p className="font-medium">{prescriptionPreview.patient_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">MR Number</p>
+                  <p className="font-medium font-mono">{prescriptionPreview.patient_mr_number || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Age / Gender</p>
+                  <p className="font-medium">{prescriptionPreview.patient_age_gender || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDate(prescriptionPreview.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Doctor</p>
+                  <p className="font-medium">{prescriptionPreview.doctor_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">OP Number</p>
+                  <p className="font-medium font-mono">{prescriptionPreview.op_number || '-'}</p>
+                </div>
+              </div>
+
+              {/* Diagnosis */}
+              {prescriptionPreview.diagnosis && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">Diagnosis</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.diagnosis}</p>
+                </div>
+              )}
+
+              {/* Complaint */}
+              {prescriptionPreview.complaint && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">Complaint</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.complaint}</p>
+                </div>
+              )}
+
+              {/* History */}
+              {prescriptionPreview.history && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">History</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.history}</p>
+                </div>
+              )}
+
+              {/* Medicines Table */}
+              {prescriptionPreview.medicines && prescriptionPreview.medicines.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-2">Medicines</p>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-primary/10">
+                          <TableHead className="font-bold text-primary w-10">#</TableHead>
+                          <TableHead className="font-bold text-primary">Medicine</TableHead>
+                          <TableHead className="font-bold text-primary">Dosage</TableHead>
+                          <TableHead className="font-bold text-primary">Frequency</TableHead>
+                          <TableHead className="font-bold text-primary">Duration</TableHead>
+                          <TableHead className="font-bold text-primary">Instructions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {prescriptionPreview.medicines.map((med, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{idx + 1}</TableCell>
+                            <TableCell className="font-medium">{med.medicine_name}</TableCell>
+                            <TableCell>{med.dosage || '-'}</TableCell>
+                            <TableCell>{med.frequency || '-'}</TableCell>
+                            <TableCell>{med.duration || '-'}</TableCell>
+                            <TableCell>{med.instructions || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Lab Tests */}
+              {prescriptionPreview.lab_tests && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">Lab Tests</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.lab_tests}</p>
+                </div>
+              )}
+
+              {/* Advice */}
+              {prescriptionPreview.advice && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">Advice</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.advice}</p>
+                </div>
+              )}
+
+              {/* Follow Up */}
+              {prescriptionPreview.follow_up_days && (
+                <div>
+                  <p className="text-sm font-semibold text-primary mb-1">Follow Up</p>
+                  <p className="text-sm p-3 bg-muted rounded-lg">After {prescriptionPreview.follow_up_days} days</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => setPrescriptionPreview(null)} className="font-bold">
+                  Close
+                </Button>
+                <Button
+                  onClick={() => handleDownloadPrescription(prescriptionPreview)}
+                  className="gap-2 font-bold"
+                >
+                  <Download className="w-4 h-4" />
+                  Download / Print
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

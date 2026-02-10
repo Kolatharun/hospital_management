@@ -17,7 +17,9 @@ export function DayPayments() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isLoading, setIsLoading] = useState(true);
   const [shareDialog, setShareDialog] = useState<{ type: 'whatsapp' | 'email' } | null>(null);
-  const [shareContact, setShareContact] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [emailAddress, setEmailAddress] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const isToday = selectedDate === today;
@@ -31,15 +33,14 @@ export function DayPayments() {
     try {
       const [summaryData, billsData] = await Promise.all([
         billingService.getDaySummary(selectedDate),
-        billingService.getTodayBills(),
+        billingService.search({
+          from_date: selectedDate,
+          to_date: selectedDate,
+          limit: 100,
+        }),
       ]);
       setSummary(summaryData);
-      // Filter bills by selected date
-      const filteredBills = billsData.filter(bill => {
-        const billDate = format(new Date(bill.created_at), 'yyyy-MM-dd');
-        return billDate === selectedDate;
-      });
-      setBills(filteredBills);
+      setBills(billsData);
     } catch (error) {
       console.error('Failed to load payment data:', error);
       toast({
@@ -84,61 +85,70 @@ export function DayPayments() {
     }
   };
 
-  const generateSummaryText = () => {
-    return (
-      `*Balaji Heart Center - Day Payments Summary*\n\n` +
-      `Date: ${format(new Date(selectedDate), 'dd-MM-yyyy')}\n\n` +
-      `Cash: Rs.${cashTotal}\n` +
-      `Card: Rs.${cardTotal}\n` +
-      `UPI: Rs.${upiTotal}\n\n` +
-      `*Total Collection: Rs.${grandTotal}*\n\n` +
-      `Total Transactions: ${totalTransactions}`
-    );
+  const validatePhone = (phone: string): boolean => {
+    const digits = phone.replace(/[^0-9]/g, '');
+    if (!phone.trim()) {
+      toast({ title: 'Validation Error', description: 'Please enter a phone number.', variant: 'destructive' });
+      return false;
+    }
+    if (digits.length < 10) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid phone number (minimum 10 digits).', variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
-  const handleWhatsAppShare = () => {
-    if (!shareContact) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a phone number.',
-        variant: 'destructive',
-      });
-      return;
+  const validateEmail = (email: string): boolean => {
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email.trim()) {
+      toast({ title: 'Validation Error', description: 'Please enter an email address.', variant: 'destructive' });
+      return false;
     }
-
-    const message = encodeURIComponent(generateSummaryText());
-    const phoneNumber = shareContact.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
-
-    toast({
-      title: 'WhatsApp Opened',
-      description: 'Summary sent to WhatsApp.',
-    });
-    setShareDialog(null);
-    setShareContact('');
+    if (!emailPattern.test(email.trim())) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid email address.', variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
-  const handleEmailShare = () => {
-    if (!shareContact) {
+  const handleWhatsAppShare = async () => {
+    if (!validatePhone(phoneNumber)) return;
+
+    setIsSending(true);
+    try {
+      await billingService.sendDaySummaryWhatsApp(selectedDate, phoneNumber);
       toast({
-        title: 'Error',
-        description: 'Please enter an email address.',
-        variant: 'destructive',
+        title: 'WhatsApp Sent',
+        description: 'Day payments summary PDF sent successfully via WhatsApp.',
       });
-      return;
+      setShareDialog(null);
+      setPhoneNumber('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send WhatsApp';
+      toast({ title: 'WhatsApp Error', description: message, variant: 'destructive' });
+    } finally {
+      setIsSending(false);
     }
+  };
 
-    const subject = encodeURIComponent(`Balaji Heart Center - Day Payments Summary - ${format(new Date(selectedDate), 'dd-MM-yyyy')}`);
-    const body = encodeURIComponent(generateSummaryText().replace(/\*/g, ''));
+  const handleEmailShare = async () => {
+    if (!validateEmail(emailAddress)) return;
 
-    window.open(`mailto:${shareContact}?subject=${subject}&body=${body}`, '_blank');
-
-    toast({
-      title: 'Email Client Opened',
-      description: 'Summary ready to send.',
-    });
-    setShareDialog(null);
-    setShareContact('');
+    setIsSending(true);
+    try {
+      await billingService.sendDaySummaryEmail(selectedDate, emailAddress);
+      toast({
+        title: 'Email Sent',
+        description: `Day payments summary PDF sent successfully to ${emailAddress}.`,
+      });
+      setShareDialog(null);
+      setEmailAddress('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send email';
+      toast({ title: 'Email Error', description: message, variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handlePrint = () => {
@@ -402,7 +412,7 @@ export function DayPayments() {
       </Card>
 
       {/* Share Dialog */}
-      <Dialog open={!!shareDialog} onOpenChange={() => { setShareDialog(null); setShareContact(''); }}>
+      <Dialog open={!!shareDialog} onOpenChange={() => { setShareDialog(null); setPhoneNumber(''); setEmailAddress(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -423,24 +433,45 @@ export function DayPayments() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {shareDialog?.type === 'whatsapp' ? 'Phone Number' : 'Email Address'}
-              </label>
-              <Input
-                type={shareDialog?.type === 'whatsapp' ? 'tel' : 'email'}
-                placeholder={shareDialog?.type === 'whatsapp' ? '+91 9876543210' : 'manager@clinic.com'}
-                value={shareContact}
-                onChange={(e) => setShareContact(e.target.value)}
-              />
-            </div>
+            {shareDialog?.type === 'whatsapp' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone Number</label>
+                <Input
+                  type="tel"
+                  placeholder="+91 9876543210"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
+              </div>
+            )}
+
+            {shareDialog?.type === 'email' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address</label>
+                <Input
+                  type="email"
+                  placeholder="manager@clinic.com"
+                  value={emailAddress}
+                  onChange={(e) => setEmailAddress(e.target.value)}
+                />
+              </div>
+            )}
 
             <Button
               onClick={() => shareDialog?.type === 'whatsapp' ? handleWhatsAppShare() : handleEmailShare()}
-              className="w-full gap-2"
+              className="w-full gap-2 font-bold"
+              disabled={isSending}
             >
-              <Send className="w-4 h-4" />
-              {shareDialog?.type === 'whatsapp' ? 'Open WhatsApp' : 'Send Email'}
+              {isSending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              {isSending
+                ? 'Sending...'
+                : shareDialog?.type === 'whatsapp'
+                  ? 'Send via WhatsApp'
+                  : 'Send Email'}
             </Button>
           </div>
         </DialogContent>

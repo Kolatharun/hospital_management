@@ -21,6 +21,8 @@ from app.schemas.billing import (
     BillResponse,
     PaymentRecord,
     DaySummaryResponse,
+    DaySummarySendEmailRequest,
+    DaySummarySendWhatsAppRequest,
 )
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -125,6 +127,124 @@ def search_bills(
         limit=limit,
     )
     return [service.build_response(b) for b in bills]
+
+
+@router.post("/summary/send-email")
+def send_day_summary_email(
+    data: DaySummarySendEmailRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE])),
+):
+    """Generate day payment summary PDF and send via email."""
+    from app.utils.receipt_generator import generate_day_summary_pdf
+    from app.utils.notification_service import send_email_with_day_summary, cleanup_temp_file
+
+    service = BillingService(db)
+    summary = service.get_day_summary(data.target_date)
+    bills = service.search_bills(from_date=data.target_date, to_date=data.target_date, limit=100)
+
+    formatted_date = data.target_date.strftime("%d-%m-%Y")
+    bills_data = [
+        {
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "bill_number": b.bill_number,
+            "patient_name": b.patient_name,
+            "uhid": b.uhid or "-",
+            "payment_method": b.payment_method.value if b.payment_method else None,
+            "paid_amount": float(b.paid_amount or 0),
+        }
+        for b in bills
+    ]
+
+    pdf_path = None
+    try:
+        pdf_path = generate_day_summary_pdf(
+            summary_date=formatted_date,
+            cash_total=float(summary.cash_amount),
+            card_total=float(summary.card_amount),
+            upi_total=float(summary.upi_amount),
+            grand_total=float(summary.total_paid),
+            total_transactions=summary.total_bills,
+            bills=bills_data,
+        )
+        send_email_with_day_summary(
+            to_email=data.email,
+            summary_date=formatted_date,
+            pdf_path=pdf_path,
+        )
+        return {"message": f"Day summary sent successfully to {data.email}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email: {str(e)}",
+        )
+    finally:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
+
+
+@router.post("/summary/send-whatsapp")
+def send_day_summary_whatsapp(
+    data: DaySummarySendWhatsAppRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE])),
+):
+    """Generate day payment summary PDF and send via WhatsApp."""
+    from app.utils.receipt_generator import generate_day_summary_pdf
+    from app.utils.notification_service import send_whatsapp_with_day_summary, cleanup_temp_file
+
+    service = BillingService(db)
+    summary = service.get_day_summary(data.target_date)
+    bills = service.search_bills(from_date=data.target_date, to_date=data.target_date, limit=100)
+
+    formatted_date = data.target_date.strftime("%d-%m-%Y")
+    bills_data = [
+        {
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "bill_number": b.bill_number,
+            "patient_name": b.patient_name,
+            "uhid": b.uhid or "-",
+            "payment_method": b.payment_method.value if b.payment_method else None,
+            "paid_amount": float(b.paid_amount or 0),
+        }
+        for b in bills
+    ]
+
+    pdf_path = None
+    try:
+        pdf_path = generate_day_summary_pdf(
+            summary_date=formatted_date,
+            cash_total=float(summary.cash_amount),
+            card_total=float(summary.card_amount),
+            upi_total=float(summary.upi_amount),
+            grand_total=float(summary.total_paid),
+            total_transactions=summary.total_bills,
+            bills=bills_data,
+        )
+        send_whatsapp_with_day_summary(
+            phone_number=data.phone,
+            summary_date=formatted_date,
+            pdf_path=pdf_path,
+        )
+        return {"message": f"Day summary sent successfully via WhatsApp to {data.phone}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send WhatsApp: {str(e)}",
+        )
+    finally:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
 
 
 @router.get("/{bill_id}", response_model=BillResponse)

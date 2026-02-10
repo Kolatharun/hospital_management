@@ -26,6 +26,7 @@ export interface Bill {
   doctor_name?: string;
   speciality?: string;
   mobile_no?: string;
+  patient_email?: string;
   patient_type?: string;
   token_number?: string;
   consultation_fee: number;
@@ -171,6 +172,14 @@ export const billingService = {
 
   async sendWhatsApp(billId: string, phone?: string): Promise<{ message: string }> {
     return api.post<{ message: string }>(`/billing/${billId}/send-whatsapp`, { phone: phone || null });
+  },
+
+  async sendDaySummaryEmail(targetDate: string, email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/billing/summary/send-email', { target_date: targetDate, email });
+  },
+
+  async sendDaySummaryWhatsApp(targetDate: string, phone: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/billing/summary/send-whatsapp', { target_date: targetDate, phone });
   },
 
   getReceiptPdfUrl(billId: string): string {

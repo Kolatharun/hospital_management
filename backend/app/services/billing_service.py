@@ -380,6 +380,13 @@ class BillingService:
             for item in bill.line_items
         ]
 
+        patient_email = None
+        try:
+            if bill.patient and bill.patient.email:
+                patient_email = bill.patient.email
+        except Exception:
+            pass
+
         return BillResponse(
             id=bill.id,
             bill_number=bill.bill_number,
@@ -393,6 +400,7 @@ class BillingService:
             doctor_name=bill.doctor_name,
             speciality=bill.speciality,
             mobile_no=bill.mobile_no,
+            patient_email=patient_email,
             patient_type=bill.patient_type,
             token_number=bill.token_number,
             consultation_fee=bill.consultation_fee,

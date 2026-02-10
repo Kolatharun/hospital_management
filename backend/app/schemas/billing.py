@@ -4,6 +4,8 @@ Billing Schemas - Bill and payment related schemas
 Derived from frontend BillingSection.tsx form fields.
 """
 
+import re
+from datetime import date
 from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
@@ -124,6 +126,7 @@ class BillResponse(BillBase):
     doctor_name: Optional[str] = None
     speciality: Optional[str] = None
     mobile_no: Optional[str] = None
+    patient_email: Optional[str] = None
     patient_type: Optional[str] = None
     token_number: Optional[str] = None
 
@@ -183,6 +186,36 @@ class BillReceiptResponse(BillResponse):
     clinic_name: str = "Balaji Heart Center"
     clinic_address: str = "Hyderabad, Telangana"
     clinic_phone: str = "+91 9876543210"
+
+
+class DaySummarySendEmailRequest(BaseModel):
+    """Request to send day payment summary via email."""
+
+    target_date: date
+    email: str = Field(..., max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(pattern, v.strip()):
+            raise ValueError("Please enter a valid email address")
+        return v.strip()
+
+
+class DaySummarySendWhatsAppRequest(BaseModel):
+    """Request to send day payment summary via WhatsApp."""
+
+    target_date: date
+    phone: str = Field(..., max_length=20)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        digits = re.sub(r"[^0-9]", "", v)
+        if len(digits) < 10:
+            raise ValueError("Please enter a valid phone number (minimum 10 digits)")
+        return v.strip()
 
 
 # Aliases for backward compatibility
