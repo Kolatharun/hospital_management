@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_ACCESS_TOKEN: str = ""
 
+    # Lab Contact Details - for sending prescriptions to lab
+    LAB_EMAIL: str = ""
+    LAB_PHONE: str = ""
+
+    # Pharmacy Contact Details - for sending prescriptions to pharmacy
+    PHARMACY_EMAIL: str = ""
+    PHARMACY_PHONE: str = ""
+
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000

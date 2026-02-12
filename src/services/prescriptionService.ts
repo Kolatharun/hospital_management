@@ -103,6 +103,49 @@ export const prescriptionService = {
   async sendToPatient(prescriptionId: string, method: 'whatsapp' | 'email'): Promise<Prescription> {
     return api.post<Prescription>(`/prescriptions/${prescriptionId}/send-to-patient`, { method });
   },
+
+  async generatePdf(prescriptionId: string): Promise<{ message: string; pdf_path: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/generate-pdf`);
+  },
+
+  async downloadPdf(prescriptionId: string): Promise<Blob> {
+    const token = localStorage.getItem('access_token');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const response = await fetch(`${baseUrl}/prescriptions/${prescriptionId}/download-pdf`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to download prescription PDF');
+    }
+    return response.blob();
+  },
+
+  async sendEmail(prescriptionId: string, email: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-email`, { email });
+  },
+
+  async sendWhatsApp(prescriptionId: string, phone: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-whatsapp`, { phone });
+  },
+
+  async sendToLabEmail(prescriptionId: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-to-lab-email`);
+  },
+
+  async sendToLabWhatsApp(prescriptionId: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-to-lab-whatsapp`);
+  },
+
+  async sendToPharmacyEmail(prescriptionId: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-to-pharmacy-email`);
+  },
+
+  async sendToPharmacyWhatsApp(prescriptionId: string): Promise<{ message: string }> {
+    return api.post(`/prescriptions/${prescriptionId}/send-to-pharmacy-whatsapp`);
+  },
 };
 
 export default prescriptionService;

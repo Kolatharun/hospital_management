@@ -140,3 +140,15 @@ class SendPrescriptionRequest(BaseModel):
         json_schema_extra = {
             "example": {"method": "whatsapp"}
         }
+
+
+class SendPrescriptionEmailRequest(BaseModel):
+    """Request to send prescription via email."""
+
+    email: str = Field(..., description="Recipient email address")
+
+
+class SendPrescriptionWhatsAppRequest(BaseModel):
+    """Request to send prescription via WhatsApp."""
+
+    phone: str = Field(..., description="Recipient phone number")

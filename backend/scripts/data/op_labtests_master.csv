@@ -1,0 +1,35 @@
+Code,Category,Test Name
+L001,Cardiac Enzymes,Troponin I
+L002,Cardiac Enzymes,Troponin T
+L003,Cardiac Enzymes,CK-MB
+L004,Cardiac Enzymes,Total CK (CPK)
+L005,Cardiac Enzymes,Myoglobin
+L006,Cardiac Enzymes,LDH
+L007,Heart Failure,BNP
+L008,Heart Failure,NT-proBNP
+L009,Lipid Profile,Total cholesterol
+L010,Lipid Profile,LDL
+L011,Lipid Profile,HDL
+L012,Lipid Profile,Triglycerides
+L013,Lipid Profile,VLDL
+L014,Diabetes,Fasting blood sugar
+L015,Diabetes,Post-prandial blood sugar
+L016,Diabetes,HbA1c
+L017,Electrolytes,Sodium
+L018,Electrolytes,Potassium
+L019,Electrolytes,Calcium
+L020,Electrolytes,Magnesium
+L021,Renal,Blood urea
+L022,Renal,Serum creatinine
+L023,Renal,eGFR
+L024,Inflammatory,hs-CRP
+L025,Inflammatory,ESR
+L026,Inflammatory,Homocysteine
+L027,Inflammatory,Lipoprotein (a)
+L028,Coagulation,PT / INR
+L029,Coagulation,aPTT
+L030,Coagulation,D-dimer
+L031,Coagulation,Fibrinogen
+L032,Thyroid,TSH
+L033,Thyroid,T3
+L034,Thyroid,T4

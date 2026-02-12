@@ -23,6 +23,7 @@ export interface Appointment {
   patient_name?: string;
   patient_mr_number?: string;
   patient_phone?: string;
+  patient_email?: string;
   patient_age_gender?: string;
   doctor_name?: string;
 }

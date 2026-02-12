@@ -152,7 +152,14 @@ class Appointment(BaseModel):
         Integer,
         nullable=True,
         default=0,
-        comment="Waiting time in minutes",
+        comment="Calculated waiting time in minutes (based on queue position)",
+    )
+
+    buffer_time_minutes = Column(
+        Integer,
+        nullable=True,
+        default=0,
+        comment="Extra buffer time added to this patient's consultation slot",
     )
 
     # Timestamps for status changes

@@ -37,6 +37,31 @@ class LabQueueRepository(BaseRepository[LabQueueItem]):
             query = query.filter(LabQueueItem.status == status)
         return query.order_by(LabQueueItem.token_number).all()
 
+    def get_pending_queue(self) -> List[LabQueueItem]:
+        """Get pending/waiting lab queue items for today."""
+        today = date.today()
+        return self.db.query(LabQueueItem).filter(
+            func.date(LabQueueItem.created_at) == today,
+            LabQueueItem.is_deleted == False,
+            LabQueueItem.status.in_([QueueStatus.PENDING, QueueStatus.WAITING]),
+        ).order_by(LabQueueItem.token_number).all()
+
+    def update_status(self, item_id: UUID, new_status: QueueStatus) -> Optional[LabQueueItem]:
+        """Update the status of a lab queue item."""
+        item = self.get_by_id(item_id)
+        if not item:
+            return None
+        item.status = new_status
+        if new_status == QueueStatus.IN_PROGRESS:
+            from datetime import datetime
+            item.collected_at = datetime.utcnow().isoformat()
+        elif new_status == QueueStatus.COMPLETED:
+            from datetime import datetime
+            item.completed_at = datetime.utcnow().isoformat()
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
     def get_queue_stats(self) -> Dict[str, int]:
         """Get lab queue statistics for today."""
         today = date.today()
@@ -84,6 +109,31 @@ class PharmacyQueueRepository(BaseRepository[PharmacyQueueItem]):
         if status:
             query = query.filter(PharmacyQueueItem.status == status)
         return query.order_by(PharmacyQueueItem.token_number).all()
+
+    def get_pending_queue(self) -> List[PharmacyQueueItem]:
+        """Get pending/waiting pharmacy queue items for today."""
+        today = date.today()
+        return self.db.query(PharmacyQueueItem).filter(
+            func.date(PharmacyQueueItem.created_at) == today,
+            PharmacyQueueItem.is_deleted == False,
+            PharmacyQueueItem.status.in_([QueueStatus.PENDING, QueueStatus.WAITING]),
+        ).order_by(PharmacyQueueItem.token_number).all()
+
+    def update_status(self, item_id: UUID, new_status: QueueStatus) -> Optional[PharmacyQueueItem]:
+        """Update the status of a pharmacy queue item."""
+        item = self.get_by_id(item_id)
+        if not item:
+            return None
+        item.status = new_status
+        if new_status == QueueStatus.IN_PROGRESS:
+            from datetime import datetime
+            item.dispensed_at = datetime.utcnow().isoformat()
+        elif new_status == QueueStatus.COMPLETED:
+            from datetime import datetime
+            item.completed_at = datetime.utcnow().isoformat()
+        self.db.commit()
+        self.db.refresh(item)
+        return item
 
     def get_queue_stats(self) -> Dict[str, int]:
         """Get pharmacy queue statistics for today."""

@@ -13,6 +13,11 @@ from app.repositories.base import BaseRepository
 from app.models.appointment import Appointment, AppointmentStatus, QueueType
 
 
+# Configurable consultation slot settings for queue waiting time calculation
+CONSULTATION_TIME_MINUTES = 15
+BUFFER_TIME_MINUTES = 0
+
+
 class AppointmentRepository(BaseRepository[Appointment]):
     """Repository for Appointment model operations."""
 
@@ -200,17 +205,57 @@ class AppointmentRepository(BaseRepository[Appointment]):
         return appointment
 
     def add_buffer_time(self, appointment_id: UUID, minutes: int) -> Optional[Appointment]:
-        """Add buffer time to waiting appointment."""
+        """Add buffer time to a patient's consultation slot."""
         appointment = self.get_by_id(appointment_id)
         if not appointment:
             return None
 
-        current = appointment.waiting_time_minutes or 0
-        appointment.waiting_time_minutes = current + minutes
+        current = appointment.buffer_time_minutes or 0
+        appointment.buffer_time_minutes = current + minutes
 
         self.db.commit()
         self.db.refresh(appointment)
         return appointment
+
+    def recalculate_waiting_times(self) -> None:
+        """Recalculate waiting_time_minutes for all today's appointments based on queue position.
+
+        Each patient's effective slot = CONSULTATION_TIME_MINUTES + BUFFER_TIME_MINUTES + their buffer_time_minutes.
+        A patient's waiting time = sum of effective slots of all patients ahead of them in queue.
+
+        - In-progress patient: 0 min (already with doctor)
+        - Waiting patients: cumulative sum of preceding slots
+        - Completed/cancelled: 0 min
+        """
+        today = date.today()
+        base_slot = CONSULTATION_TIME_MINUTES + BUFFER_TIME_MINUTES
+
+        appointments = self.db.query(Appointment).filter(
+            Appointment.appointment_date == today,
+            Appointment.is_deleted == False,
+        ).order_by(Appointment.token_number).all()
+
+        # Build ordered list of active patients (in-progress first, then waiting)
+        active_queue = [a for a in appointments if a.status == AppointmentStatus.IN_PROGRESS]
+        active_queue += [a for a in appointments if a.status == AppointmentStatus.WAITING]
+
+        # Calculate cumulative waiting time
+        cumulative = 0
+        for apt in active_queue:
+            effective_slot = base_slot + (apt.buffer_time_minutes or 0)
+            if apt.status == AppointmentStatus.IN_PROGRESS:
+                apt.waiting_time_minutes = 0
+                cumulative += effective_slot
+            elif apt.status == AppointmentStatus.WAITING:
+                apt.waiting_time_minutes = cumulative
+                cumulative += effective_slot
+
+        # Zero out completed/cancelled
+        for apt in appointments:
+            if apt.status in (AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED):
+                apt.waiting_time_minutes = 0
+
+        self.db.commit()
 
     def get_billable_appointments(self, appointment_date: Optional[date] = None) -> List[Appointment]:
         """Get appointments that can be billed (completed, not yet billed)."""

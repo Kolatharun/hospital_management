@@ -74,6 +74,7 @@ class AppointmentResponse(BaseModel):
     patient_name: Optional[str] = None
     patient_mr_number: Optional[str] = None
     patient_phone: Optional[str] = None
+    patient_email: Optional[str] = None
     patient_age_gender: Optional[str] = None
     doctor_name: Optional[str] = None
 

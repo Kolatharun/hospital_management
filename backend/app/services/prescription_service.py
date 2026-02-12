@@ -2,6 +2,8 @@
 Prescription Service - Doctor prescription operations
 """
 
+import os
+import logging
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
@@ -12,6 +14,7 @@ from fastapi import HTTPException, status
 from app.repositories.prescription_repository import PrescriptionRepository, PrescriptionMedicineRepository
 from app.repositories.appointment_repository import AppointmentRepository
 from app.repositories.queue_repository import LabQueueRepository, PharmacyQueueRepository
+from app.repositories.vitals_repository import VitalsRepository
 from app.models.prescription import Prescription
 from app.models.appointment import AppointmentStatus
 from app.models.queue import QueueStatus
@@ -21,6 +24,8 @@ from app.schemas.prescription import (
     PrescriptionResponse,
     MedicineResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PrescriptionService:
@@ -33,6 +38,7 @@ class PrescriptionService:
         self.appointment_repo = AppointmentRepository(db)
         self.lab_queue_repo = LabQueueRepository(db)
         self.pharmacy_queue_repo = PharmacyQueueRepository(db)
+        self.vitals_repo = VitalsRepository(db)
 
     def create_prescription(self, data: PrescriptionCreate, doctor_id: UUID) -> Prescription:
         """Create a new prescription for an appointment."""
@@ -212,8 +218,53 @@ class PrescriptionService:
 
         return {"message": "Patient added to pharmacy queue", "medicines": medicines}
 
+    def generate_pdf(self, prescription_id: UUID) -> str:
+        """Generate prescription PDF and store in uploads/prescriptions/ folder.
+
+        Returns the stored PDF file path.
+        """
+        from app.utils.prescription_generator import generate_prescription_pdf
+
+        prescription = self.get_prescription(prescription_id)
+
+        # Fetch vitals for the appointment
+        vitals = None
+        if prescription.appointment_id:
+            vitals = self.vitals_repo.get_by_appointment(prescription.appointment_id)
+
+        return generate_prescription_pdf(prescription, vitals)
+
+    def get_pdf_path(self, prescription_id: UUID) -> str:
+        """Get path to an existing prescription PDF, or generate if missing."""
+        from app.utils.prescription_generator import PRESCRIPTIONS_DIR
+
+        prescription = self.get_prescription(prescription_id)
+
+        # Check if PDF already exists
+        op_number = prescription.appointment.op_number if prescription.appointment else None
+        if op_number:
+            filename = f"{op_number}.pdf"
+        else:
+            filename = f"{prescription.id}.pdf"
+
+        pdf_path = str(PRESCRIPTIONS_DIR / filename)
+
+        if os.path.exists(pdf_path):
+            return pdf_path
+
+        # Generate if not exists
+        return self.generate_pdf(prescription_id)
+
     def send_to_patient(self, prescription_id: UUID, method: str) -> Prescription:
-        """Send prescription to patient via WhatsApp or email."""
+        """Send prescription to patient via WhatsApp or email.
+
+        Generates PDF, sends via the specified method, and marks as sent.
+        """
+        from app.utils.notification_service import (
+            send_email_with_prescription,
+            send_whatsapp_with_prescription,
+        )
+
         prescription = self.get_prescription(prescription_id)
 
         if method not in ["whatsapp", "email"]:
@@ -222,8 +273,39 @@ class PrescriptionService:
                 detail="Method must be 'whatsapp' or 'email'",
             )
 
-        # In a real implementation, this would trigger WhatsApp/Email sending
-        # For now, we just mark it as sent
+        patient = prescription.patient
+        op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+        # Generate or get existing PDF
+        pdf_path = self.get_pdf_path(prescription_id)
+
+        if method == "email":
+            if not patient or not patient.email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Patient does not have an email address",
+                )
+            send_email_with_prescription(
+                to_email=patient.email,
+                patient_name=patient_name,
+                op_number=op_number,
+                pdf_path=pdf_path,
+            )
+        elif method == "whatsapp":
+            if not patient or not patient.phone:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Patient does not have a phone number",
+                )
+            send_whatsapp_with_prescription(
+                phone_number=patient.phone,
+                patient_name=patient_name,
+                op_number=op_number,
+                pdf_path=pdf_path,
+            )
+
+        # Mark as sent in database
         self.prescription_repo.mark_sent(prescription_id, method)
 
         return self.prescription_repo.get_with_details(prescription_id)

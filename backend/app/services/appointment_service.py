@@ -67,7 +67,9 @@ class AppointmentService:
             "notes": data.notes,
         }
 
-        return self.appointment_repo.create(appointment_data)
+        appointment = self.appointment_repo.create(appointment_data)
+        self.appointment_repo.recalculate_waiting_times()
+        return appointment
 
     def get_appointment(self, appointment_id: UUID) -> Appointment:
         """Get appointment by ID."""
@@ -172,7 +174,9 @@ class AppointmentService:
             )
 
         next_patient = waiting[0]
-        return self.appointment_repo.update_status(next_patient.id, AppointmentStatus.IN_PROGRESS)
+        result = self.appointment_repo.update_status(next_patient.id, AppointmentStatus.IN_PROGRESS)
+        self.appointment_repo.recalculate_waiting_times()
+        return result
 
     def complete_appointment(self, appointment_id: UUID) -> Appointment:
         """Complete an appointment (alias for complete_consultation)."""
@@ -192,7 +196,9 @@ class AppointmentService:
         if room:
             self.appointment_repo.update(appointment_id, {"room": room})
 
-        return self.appointment_repo.update_status(appointment_id, AppointmentStatus.IN_PROGRESS)
+        result = self.appointment_repo.update_status(appointment_id, AppointmentStatus.IN_PROGRESS)
+        self.appointment_repo.recalculate_waiting_times()
+        return result
 
     def complete_consultation(self, appointment_id: UUID) -> Appointment:
         """Complete consultation (in-progress → completed)."""
@@ -204,7 +210,9 @@ class AppointmentService:
                 detail="Can only complete appointments with 'in-progress' status",
             )
 
-        return self.appointment_repo.update_status(appointment_id, AppointmentStatus.COMPLETED)
+        result = self.appointment_repo.update_status(appointment_id, AppointmentStatus.COMPLETED)
+        self.appointment_repo.recalculate_waiting_times()
+        return result
 
     def cancel_appointment(self, appointment_id: UUID) -> Appointment:
         """Cancel appointment."""
@@ -216,12 +224,16 @@ class AppointmentService:
                 detail="Cannot cancel completed or already cancelled appointments",
             )
 
-        return self.appointment_repo.update_status(appointment_id, AppointmentStatus.CANCELLED)
+        result = self.appointment_repo.update_status(appointment_id, AppointmentStatus.CANCELLED)
+        self.appointment_repo.recalculate_waiting_times()
+        return result
 
     def add_buffer_time(self, appointment_id: UUID, minutes: int) -> Appointment:
-        """Add buffer/waiting time to appointment."""
+        """Add buffer time to a patient's consultation slot and recalculate queue."""
         appointment = self.get_appointment(appointment_id)
-        return self.appointment_repo.add_buffer_time(appointment_id, minutes)
+        result = self.appointment_repo.add_buffer_time(appointment_id, minutes)
+        self.appointment_repo.recalculate_waiting_times()
+        return result
 
     def get_queue_display(self, doctor_id: Optional[UUID] = None) -> TVDisplayResponse:
         """Get data for TV display page."""
@@ -242,16 +254,11 @@ class AppointmentService:
         waiting_queue = []
         for apt in waiting:
             if apt.patient:
-                wait_minutes = apt.waiting_time_minutes or 0
-                if apt.created_at:
-                    elapsed = (datetime.utcnow() - apt.created_at).total_seconds() / 60
-                    wait_minutes = int(elapsed) + (apt.waiting_time_minutes or 0)
-
                 waiting_queue.append(WaitingQueueItem(
                     op_number=apt.op_number,
                     patient_name=apt.patient.full_name,
                     mr_number=apt.patient.mr_number,
-                    waiting_time_minutes=wait_minutes,
+                    waiting_time_minutes=apt.waiting_time_minutes or 0,
                     token_number=apt.token_number,
                 ))
 
@@ -293,6 +300,7 @@ class AppointmentService:
             patient_name=patient.full_name if patient else None,
             patient_mr_number=patient.mr_number if patient else None,
             patient_phone=patient.phone if patient else None,
+            patient_email=patient.email if patient else None,
             patient_age_gender=patient.age_gender if patient else None,
             doctor_name=doctor.name if doctor else None,
         )

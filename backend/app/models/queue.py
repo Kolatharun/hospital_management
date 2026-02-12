@@ -94,7 +94,7 @@ class LabQueueItem(BaseModel):
 
     # Status
     status = Column(
-        Enum(QueueStatus, name="queue_status_enum", create_constraint=False, native_enum=True),
+        Enum(QueueStatus, name="queue_status_enum", native_enum=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=QueueStatus.WAITING,
         index=True,
@@ -220,7 +220,7 @@ class PharmacyQueueItem(BaseModel):
 
     # Status
     status = Column(
-        Enum(QueueStatus, name="queue_status_enum", create_constraint=False, native_enum=True),
+        Enum(QueueStatus, name="queue_status_enum", native_enum=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=QueueStatus.WAITING,
         index=True,

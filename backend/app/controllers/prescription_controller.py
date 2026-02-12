@@ -2,11 +2,13 @@
 Prescription Controller - Doctor prescription management endpoints
 """
 
+import os
 from typing import Optional
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,6 +23,8 @@ from app.schemas.prescription import (
     SendToLabRequest,
     SendToPharmacyRequest,
     SendPrescriptionRequest,
+    SendPrescriptionEmailRequest,
+    SendPrescriptionWhatsAppRequest,
 )
 
 router = APIRouter(prefix="/prescriptions", tags=["Prescriptions"])
@@ -114,12 +118,141 @@ def update_prescription(
     return service.build_response(prescription)
 
 
+@router.post("/{prescription_id}/generate-pdf")
+def generate_prescription_pdf(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate prescription PDF and store in backend folder."""
+    service = PrescriptionService(db)
+    try:
+        pdf_path = service.generate_pdf(prescription_id)
+        return {"message": "PDF generated successfully", "pdf_path": pdf_path}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
+        )
+
+
+@router.get("/{prescription_id}/download-pdf")
+def download_prescription_pdf(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download prescription PDF. Generates if not already stored."""
+    service = PrescriptionService(db)
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
+        )
+
+    if not os.path.exists(pdf_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF file not found",
+        )
+
+    filename = os.path.basename(pdf_path)
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/{prescription_id}/send-email")
+def send_prescription_email(
+    prescription_id: UUID,
+    data: SendPrescriptionEmailRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate prescription PDF and send via email."""
+    from app.utils.notification_service import send_email_with_prescription
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_email_with_prescription(
+            to_email=data.email,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+        )
+        # Mark as sent
+        service.prescription_repo.mark_sent(prescription_id, "email")
+        return {"message": f"Prescription sent successfully to {data.email}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email: {str(e)}",
+        )
+
+
+@router.post("/{prescription_id}/send-whatsapp")
+def send_prescription_whatsapp(
+    prescription_id: UUID,
+    data: SendPrescriptionWhatsAppRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate prescription PDF and send via WhatsApp."""
+    from app.utils.notification_service import send_whatsapp_with_prescription
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_whatsapp_with_prescription(
+            phone_number=data.phone,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+        )
+        # Mark as sent
+        service.prescription_repo.mark_sent(prescription_id, "whatsapp")
+        return {"message": f"Prescription sent successfully via WhatsApp to {data.phone}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send WhatsApp: {str(e)}",
+        )
+
+
 @router.post("/{prescription_id}/send-to-lab")
 def send_to_lab(
     prescription_id: UUID,
     data: SendToLabRequest,
     db: Session = Depends(get_db),
-    current_doctor: Doctor = Depends(get_current_doctor),
+    current_user: User = Depends(get_current_user),
 ):
     """Send patient to lab queue with tests."""
     service = PrescriptionService(db)
@@ -131,11 +264,185 @@ def send_to_pharmacy(
     prescription_id: UUID,
     data: SendToPharmacyRequest,
     db: Session = Depends(get_db),
-    current_doctor: Doctor = Depends(get_current_doctor),
+    current_user: User = Depends(get_current_user),
 ):
     """Send patient to pharmacy queue with medicines."""
     service = PrescriptionService(db)
     return service.send_to_pharmacy(prescription_id, data.medicines)
+
+
+@router.post("/{prescription_id}/send-to-lab-email")
+def send_to_lab_email(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send prescription PDF to lab via email with lab-specific body."""
+    from app.core.config import settings
+    from app.utils.notification_service import send_prescription_to_lab_email
+
+    if not settings.LAB_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="LAB_EMAIL is not configured in environment",
+        )
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    # Extract lab tests from the prescription
+    lab_tests = []
+    if prescription.lab_tests:
+        lab_tests = [t.strip() for t in prescription.lab_tests.split(",") if t.strip()]
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_prescription_to_lab_email(
+            to_email=settings.LAB_EMAIL,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+            lab_tests=lab_tests,
+        )
+        return {"message": f"Prescription sent to lab at {settings.LAB_EMAIL}"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email to lab: {str(e)}",
+        )
+
+
+@router.post("/{prescription_id}/send-to-lab-whatsapp")
+def send_to_lab_whatsapp(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send prescription PDF to lab via WhatsApp with lab-specific caption."""
+    from app.core.config import settings
+    from app.utils.notification_service import send_prescription_to_lab_whatsapp
+
+    if not settings.LAB_PHONE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="LAB_PHONE is not configured in environment",
+        )
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    lab_tests = []
+    if prescription.lab_tests:
+        lab_tests = [t.strip() for t in prescription.lab_tests.split(",") if t.strip()]
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_prescription_to_lab_whatsapp(
+            phone_number=settings.LAB_PHONE,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+            lab_tests=lab_tests,
+        )
+        return {"message": f"Prescription sent to lab via WhatsApp"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send WhatsApp to lab: {str(e)}",
+        )
+
+
+@router.post("/{prescription_id}/send-to-pharmacy-email")
+def send_to_pharmacy_email(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send prescription PDF to pharmacy via email with pharmacy-specific body."""
+    from app.core.config import settings
+    from app.utils.notification_service import send_prescription_to_pharmacy_email
+
+    if not settings.PHARMACY_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PHARMACY_EMAIL is not configured in environment",
+        )
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    # Extract medicine names from the prescription
+    medicines = []
+    if prescription.medicines:
+        medicines = [m.medicine_name for m in prescription.medicines if not m.is_deleted]
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_prescription_to_pharmacy_email(
+            to_email=settings.PHARMACY_EMAIL,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+            medicines=medicines,
+        )
+        return {"message": f"Prescription sent to pharmacy at {settings.PHARMACY_EMAIL}"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email to pharmacy: {str(e)}",
+        )
+
+
+@router.post("/{prescription_id}/send-to-pharmacy-whatsapp")
+def send_to_pharmacy_whatsapp(
+    prescription_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send prescription PDF to pharmacy via WhatsApp with pharmacy-specific caption."""
+    from app.core.config import settings
+    from app.utils.notification_service import send_prescription_to_pharmacy_whatsapp
+
+    if not settings.PHARMACY_PHONE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PHARMACY_PHONE is not configured in environment",
+        )
+
+    service = PrescriptionService(db)
+    prescription = service.get_prescription(prescription_id)
+    patient = prescription.patient
+    op_number = prescription.appointment.op_number if prescription.appointment else str(prescription.id)[:8]
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    medicines = []
+    if prescription.medicines:
+        medicines = [m.medicine_name for m in prescription.medicines if not m.is_deleted]
+
+    try:
+        pdf_path = service.get_pdf_path(prescription_id)
+        send_prescription_to_pharmacy_whatsapp(
+            phone_number=settings.PHARMACY_PHONE,
+            patient_name=patient_name,
+            op_number=op_number,
+            pdf_path=pdf_path,
+            medicines=medicines,
+        )
+        return {"message": f"Prescription sent to pharmacy via WhatsApp"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send WhatsApp to pharmacy: {str(e)}",
+        )
 
 
 @router.post("/{prescription_id}/send-to-patient", response_model=PrescriptionResponse)

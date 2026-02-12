@@ -173,6 +173,11 @@ interface ClinicDataContextType {
   updateLabQueueStatus: (id: string, status: LabQueueItem['status']) => Promise<void>;
   addToPharmacyQueue: (item: Omit<PharmacyQueueItem, 'id' | 'tokenNumber' | 'createdAt'>) => Promise<void>;
   updatePharmacyQueueStatus: (id: string, status: PharmacyQueueItem['status']) => Promise<void>;
+  refreshLabQueue: () => Promise<void>;
+  refreshPharmacyQueue: () => Promise<void>;
+
+  // Buffer time
+  addBufferTime: (appointmentId: string, minutes: number) => Promise<void>;
 
   // Billing operations (kept local for now)
   addPendingBillingItem: (item: Omit<PendingBillingItem, 'id' | 'addedAt'>) => void;
@@ -213,7 +218,8 @@ function mapApiAppointmentToAppointment(apiApt: ApiAppointment, patients: Patien
       mrNumber: apiApt.patient_mr_number || '',
       firstName: apiApt.patient_name?.split(' ')[0] || '',
       lastName: apiApt.patient_name?.split(' ').slice(1).join(' ') || '',
-      phone: '',
+      phone: apiApt.patient_phone || '',
+      email: apiApt.patient_email || undefined,
       gender: 'Male',
       createdAt: '',
     },
@@ -222,7 +228,7 @@ function mapApiAppointmentToAppointment(apiApt: ApiAppointment, patients: Patien
     date: apiApt.appointment_date,
     time: apiApt.appointment_time || '',
     status: apiApt.status as Appointment['status'],
-    waitingTime: 0,
+    waitingTime: apiApt.waiting_time_minutes || 0,
     room: apiApt.room || '1',
     notes: apiApt.notes || undefined,
     opNumber: apiApt.op_number,
@@ -407,6 +413,37 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
       console.error('Failed to refresh appointments:', err);
     }
   }, [patients]);
+
+  const refreshLabQueue = useCallback(async () => {
+    try {
+      const data = await queueService.getLabQueue();
+      setLabQueue(data.map(mapApiLabQueueToLabQueueItem));
+    } catch (err) {
+      console.error('Failed to refresh lab queue:', err);
+    }
+  }, []);
+
+  const refreshPharmacyQueue = useCallback(async () => {
+    try {
+      const data = await queueService.getPharmacyQueue();
+      setPharmacyQueue(data.map(mapApiPharmacyQueueToPharmacyQueueItem));
+    } catch (err) {
+      console.error('Failed to refresh pharmacy queue:', err);
+    }
+  }, []);
+
+  // Auto-refresh polling: keep appointments, lab queue, pharmacy queue in sync every 15 seconds
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+
+    const intervalId = setInterval(() => {
+      refreshAppointments();
+      refreshLabQueue();
+      refreshPharmacyQueue();
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, authLoading, refreshAppointments, refreshLabQueue, refreshPharmacyQueue]);
 
   // Patient operations
   const addPatient = async (patientData: Omit<Patient, 'id' | 'mrNumber' | 'createdAt'>): Promise<Patient> => {
@@ -614,6 +651,13 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  // Buffer time operation
+  const addBufferTime = async (appointmentId: string, minutes: number) => {
+    await appointmentService.addBufferTime(appointmentId, minutes);
+    // Refresh from DB to get recalculated waiting times for all patients
+    await refreshAppointments();
+  };
+
   // Billing operations (kept local for now - can be connected to billing API later)
   const addPendingBillingItem = (item: Omit<PendingBillingItem, 'id' | 'addedAt'>) => {
     const newItem: PendingBillingItem = {
@@ -662,6 +706,9 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
         updateLabQueueStatus,
         addToPharmacyQueue,
         updatePharmacyQueueStatus,
+        refreshLabQueue,
+        refreshPharmacyQueue,
+        addBufferTime,
         addPendingBillingItem,
         removePendingBillingItem,
       }}

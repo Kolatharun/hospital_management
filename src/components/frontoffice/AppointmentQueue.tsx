@@ -6,97 +6,90 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Clock, Phone, TestTube, Pill, Stethoscope, Plus, X, MessageSquare, Mail, Check } from 'lucide-react';
+import { Users, Clock, Phone, TestTube, Pill, Stethoscope, Plus, MessageSquare, Mail, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface NowServingInfo {
-  opNumber: string;
-  patientName: string;
-  roomNumber: string;
-  queueType: 'main' | 'lab' | 'pharmacy';
-}
 
 export function AppointmentQueue() {
   const {
     getTodayAppointments,
     updateAppointmentStatus,
+    addBufferTime,
     labQueue,
     pharmacyQueue,
     updateLabQueueStatus,
-    updatePharmacyQueueStatus
+    updatePharmacyQueueStatus,
+    refreshAppointments,
   } = useClinicData();
   const { announcePatientCall, announceLabCall, announcePharmacyCall } = useVoiceAnnouncement();
   const { toast } = useToast();
 
-  const [nowServing, setNowServing] = useState<NowServingInfo | null>(null);
   const [activeQueue, setActiveQueue] = useState<'main' | 'lab' | 'pharmacy'>('main');
-  const [waitingTimeBuffers, setWaitingTimeBuffers] = useState<Record<string, number>>({});
+  const [callingId, setCallingId] = useState<string | null>(null);
 
   const todayAppointments = getTodayAppointments();
   const waitingAppointments = todayAppointments.filter(a => a.status === 'waiting');
   const inProgressAppointments = todayAppointments.filter(a => a.status === 'in-progress');
   const completedAppointments = todayAppointments.filter(a => a.status === 'completed');
 
-  const generateOPNumber = (appointment: Appointment) => {
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const index = todayAppointments.indexOf(appointment) + 1;
-    return `OP-${date}-${String(index).padStart(3, '0')}`;
-  };
+  // Derive "Now Serving" from DB state — the first in-progress appointment
+  const currentPatient = inProgressAppointments[0] || null;
+  const hasPatientInProgress = inProgressAppointments.length > 0;
 
-  const getWaitingTime = (appointment: Appointment, index: number) => {
-    const baseTime = index * 15;
-    const buffer = waitingTimeBuffers[appointment.id] || 0;
-    return baseTime + buffer;
-  };
-
-  const handleBuffer = (appointmentId: string) => {
-    setWaitingTimeBuffers(prev => ({
-      ...prev,
-      [appointmentId]: (prev[appointmentId] || 0) + 5
-    }));
-  };
-
-  const handleCall = (appointment: Appointment, queueType: 'main' | 'lab' | 'pharmacy' = 'main') => {
-    const opNumber = generateOPNumber(appointment);
-    const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`;
-    const roomNumber = appointment.room || '1';
-
-    // Update status to In Consultation
-    if (queueType === 'main') {
-      updateAppointmentStatus(appointment.id, 'in-progress');
+  const handleCall = async (appointment: Appointment) => {
+    if (hasPatientInProgress) {
+      toast({
+        title: 'Cannot Call',
+        description: 'Doctor must complete the current consultation before calling next patient.',
+        variant: 'destructive',
+      });
+      return;
     }
 
-    // Set now serving info for banner
-    setNowServing({
-      opNumber,
-      patientName,
-      roomNumber,
-      queueType,
-    });
+    setCallingId(appointment.id);
+    try {
+      await updateAppointmentStatus(appointment.id, 'in-progress');
+      await refreshAppointments();
 
-    // Voice announcement based on queue type
-    switch (queueType) {
-      case 'main':
-        announcePatientCall(opNumber, patientName, roomNumber);
-        break;
-      case 'lab':
-        announceLabCall(opNumber, patientName);
-        break;
-      case 'pharmacy':
-        announcePharmacyCall(opNumber, patientName);
-        break;
+      const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`;
+      const roomNumber = appointment.room || '1';
+      const opNumber = appointment.opNumber || `OP-${appointment.tokenNumber}`;
+
+      announcePatientCall(opNumber, patientName, roomNumber);
+
+      toast({
+        title: 'Patient Called',
+        description: `${patientName} has been called to Room ${roomNumber}`,
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to call patient. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCallingId(null);
+    }
+  };
+
+  const handleBuffer = async (appointmentId: string) => {
+    try {
+      await addBufferTime(appointmentId, 5);
+      toast({
+        title: 'Buffer Added',
+        description: '+5 minutes buffer time added.',
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to add buffer time.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleLabCall = async (item: LabQueueItem) => {
     try {
       await updateLabQueueStatus(item.id, 'in-progress');
-      setNowServing({
-        opNumber: item.opNumber,
-        patientName: item.patientName,
-        roomNumber: 'Lab',
-        queueType: 'lab',
-      });
       announceLabCall(item.opNumber, item.patientName);
     } catch {
       toast({ title: 'Error', description: 'Failed to update lab queue status', variant: 'destructive' });
@@ -114,12 +107,6 @@ export function AppointmentQueue() {
   const handlePharmacyCall = async (item: PharmacyQueueItem) => {
     try {
       await updatePharmacyQueueStatus(item.id, 'in-progress');
-      setNowServing({
-        opNumber: item.opNumber,
-        patientName: item.patientName,
-        roomNumber: 'Pharmacy',
-        queueType: 'pharmacy',
-      });
       announcePharmacyCall(item.opNumber, item.patientName);
     } catch {
       toast({ title: 'Error', description: 'Failed to update pharmacy queue status', variant: 'destructive' });
@@ -134,14 +121,9 @@ export function AppointmentQueue() {
     }
   };
 
-  const dismissNowServing = () => {
-    setNowServing(null);
-  };
-
   const getStatusBadge = (status: string, queueType: 'main' | 'lab' | 'pharmacy' = 'main') => {
     switch (status) {
       case 'waiting':
-        // Show "Pending" for Lab and Pharmacy queues
         if (queueType === 'lab' || queueType === 'pharmacy') {
           return <Badge className="bg-warning/20 text-warning border-warning/30 font-bold">Pending</Badge>;
         }
@@ -159,35 +141,29 @@ export function AppointmentQueue() {
 
   return (
     <div className="medical-section space-y-6">
-      {/* Now Serving Banner - Fixed at top */}
-      {nowServing && (
+      {/* Now Serving Banner - Driven by DB state (in-progress appointment) */}
+      {currentPatient && (
         <div className="now-serving-banner flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div>
               <p className="text-sm opacity-80">Now Serving</p>
-              <p className="text-3xl font-bold">{nowServing.opNumber}</p>
+              <p className="text-3xl font-bold">
+                {currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`}
+              </p>
             </div>
             <div className="h-12 w-px bg-white/30" />
             <div>
               <p className="text-sm opacity-80">Patient Name</p>
-              <p className="text-2xl font-bold">{nowServing.patientName}</p>
+              <p className="text-2xl font-bold">
+                {currentPatient.patient.firstName} {currentPatient.patient.lastName}
+              </p>
             </div>
             <div className="h-12 w-px bg-white/30" />
             <div>
-              <p className="text-sm opacity-80">
-                {nowServing.queueType === 'main' ? 'Room Number' : nowServing.queueType === 'lab' ? 'Lab' : 'Pharmacy'}
-              </p>
-              <p className="text-2xl font-bold">{nowServing.roomNumber}</p>
+              <p className="text-sm opacity-80">Room Number</p>
+              <p className="text-2xl font-bold">{currentPatient.room || '1'}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={dismissNowServing}
-            className="text-white hover:bg-white/20"
-          >
-            <X className="w-6 h-6" />
-          </Button>
         </div>
       )}
 
@@ -314,10 +290,10 @@ export function AppointmentQueue() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      todayAppointments.map((appointment, index) => (
+                      todayAppointments.map((appointment) => (
                         <TableRow key={appointment.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-mono text-sm font-semibold text-accent">
-                            {generateOPNumber(appointment)}
+                            {appointment.opNumber || `OP-${appointment.tokenNumber}`}
                           </TableCell>
                           <TableCell className="font-mono text-sm">
                             {appointment.patient.mrNumber}
@@ -327,13 +303,12 @@ export function AppointmentQueue() {
                           </TableCell>
                           <TableCell>{appointment.room || '1'}</TableCell>
                           <TableCell>
-                            {appointment.status === 'waiting' && (
+                            {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
-                                {getWaitingTime(appointment, index)} min
+                                {appointment.waitingTime || 0} min
                               </span>
-                            )}
-                            {appointment.status !== 'waiting' && '-'}
+                            ) : '-'}
                           </TableCell>
                           <TableCell>{getStatusBadge(appointment.status)}</TableCell>
                           <TableCell>
@@ -343,10 +318,12 @@ export function AppointmentQueue() {
                                   <Button
                                     size="sm"
                                     className="gap-1 bg-destructive hover:bg-destructive/90 font-bold hover:scale-105 transition-transform"
-                                    onClick={() => handleCall(appointment, 'main')}
+                                    onClick={() => handleCall(appointment)}
+                                    disabled={hasPatientInProgress || callingId === appointment.id}
+                                    title={hasPatientInProgress ? 'Doctor must complete the current consultation first' : 'Call patient'}
                                   >
                                     <Phone className="w-3 h-3" />
-                                    Call
+                                    {callingId === appointment.id ? 'Calling...' : 'Call'}
                                   </Button>
                                   <Button
                                     size="sm"

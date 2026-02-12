@@ -1,0 +1,32 @@
+Code,Category,Diagnosis
+D001,Blood Pressure,Hypertension
+D002,Blood Pressure,Secondary hypertension
+D003,Blood Pressure,Pulmonary hypertension
+D004,Blood Pressure,Hypertensive heart disease
+D005,CAD,Coronary artery disease
+D006,CAD,Ischemic heart disease
+D007,CAD,Stable angina
+D008,CAD,Unstable angina
+D009,CAD,Myocardial infarction
+D010,Heart Failure,Congestive heart failure
+D011,Heart Failure,Left ventricular failure
+D012,Heart Failure,Right ventricular failure
+D013,Heart Failure,Dilated cardiomyopathy
+D014,Heart Failure,Hypertrophic cardiomyopathy
+D015,Heart Failure,Restrictive cardiomyopathy
+D016,Congenital,Atrial septal defect
+D017,Congenital,Ventricular septal defect
+D018,Congenital,Patent ductus arteriosus
+D019,Congenital,Tetralogy of Fallot
+D020,Congenital,Coarctation of aorta
+D021,Pericardial,Pericarditis
+D022,Pericardial,Pericardial effusion
+D023,Pericardial,Cardiac tamponade
+D024,Pericardial,Constrictive pericarditis
+D025,Infective,Infective endocarditis
+D026,Infective,Myocarditis
+D027,Vascular,Aortic aneurysm
+D028,Vascular,Aortic dissection
+D029,Vascular,Peripheral arterial disease
+D030,Vascular,Deep vein thrombosis
+D031,Vascular,Pulmonary embolism

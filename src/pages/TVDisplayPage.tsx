@@ -35,7 +35,7 @@ export default function TVDisplayPage() {
   const todayAppointments = getTodayAppointments();
   const waitingPatients = todayAppointments.filter(a => a.status === 'waiting');
   const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress');
-  
+
   // Get only the first patient with doctor (one record)
   const currentPatient = inProgressPatients[0] || null;
 
@@ -52,13 +52,13 @@ export default function TVDisplayPage() {
       return;
     }
 
-    const tokenNumber = String(todayAppointments.findIndex(a => a.id === currentPatient.id) + 1);
+    const opNumber = currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`;
     const patientName = `${currentPatient.patient.firstName} ${currentPatient.patient.lastName}`;
     const roomNumber = currentPatient.room || '1';
 
     const makeAnnouncement = async () => {
       setIsAnnouncing(true);
-      await announcePatientCall(tokenNumber, patientName, roomNumber);
+      await announcePatientCall(opNumber, patientName, roomNumber);
       setIsAnnouncing(false);
     };
 
@@ -85,19 +85,19 @@ export default function TVDisplayPage() {
     // This click unlocks speech synthesis for the page.
     setVoiceEnabled(true);
     if (currentPatient) {
-      const tokenNumber = String(todayAppointments.findIndex(a => a.id === currentPatient.id) + 1);
+      const opNumber = currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`;
       const patientName = `${currentPatient.patient.firstName} ${currentPatient.patient.lastName}`;
       const roomNumber = currentPatient.room || '1';
       setIsAnnouncing(true);
-      await announcePatientCall(tokenNumber, patientName, roomNumber);
+      await announcePatientCall(opNumber, patientName, roomNumber);
       setIsAnnouncing(false);
       setLastAnnouncedId(currentPatient.id);
     }
   };
 
-  const generateOPNumber = (id: string) => {
-    const index = todayAppointments.findIndex(a => a.id === id) + 1;
-    return String(index);
+  const getTokenDisplay = (appointment: typeof currentPatient) => {
+    if (!appointment) return '';
+    return appointment.tokenNumber ? String(appointment.tokenNumber) : String(todayAppointments.findIndex(a => a.id === appointment.id) + 1);
   };
 
   const formatTime = (date: Date) => {
@@ -179,7 +179,7 @@ export default function TVDisplayPage() {
             >
               <div className="flex items-center gap-6">
                 <div className="w-20 h-20 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center text-4xl font-bold flex-shrink-0">
-                  {generateOPNumber(currentPatient.id)}
+                  {getTokenDisplay(currentPatient)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-3xl font-bold text-white truncate">
@@ -235,7 +235,7 @@ export default function TVDisplayPage() {
                 <Card key={apt.id} className="p-3 bg-slate-800/50 border-slate-600 hover:border-amber-500/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-amber-500/30 text-amber-400 flex items-center justify-center text-xl font-bold flex-shrink-0">
-                      {todayAppointments.findIndex(a => a.id === apt.id) + 1}
+                      {apt.tokenNumber || (todayAppointments.findIndex(a => a.id === apt.id) + 1)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-semibold text-white truncate">
@@ -243,7 +243,7 @@ export default function TVDisplayPage() {
                       </p>
                       <p className="text-sm text-slate-400 font-mono">{apt.patient.mrNumber}</p>
                     </div>
-                    <p className="text-sm text-slate-400 flex-shrink-0">{apt.waitingTime || (index + 1) * 15} min</p>
+                    <p className="text-sm text-slate-400 flex-shrink-0">{apt.waitingTime || 0} min</p>
                   </div>
                 </Card>
               ))

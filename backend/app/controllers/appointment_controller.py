@@ -140,9 +140,9 @@ def get_appointment(
 def call_patient(
     appointment_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.DOCTOR])),
+    current_user: User = Depends(require_roles([UserRole.DOCTOR, UserRole.FRONT_OFFICE])),
 ):
-    """Call next patient (mark as in_progress)."""
+    """Call next patient (mark as in_progress). Allowed for both doctor and front office."""
     service = AppointmentService(db)
     appointment = service.call_patient(appointment_id)
     return service.build_response(appointment)
@@ -177,9 +177,9 @@ def add_buffer_time(
     appointment_id: UUID,
     minutes: int = Query(..., ge=1, le=60),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE])),
+    current_user: User = Depends(require_roles([UserRole.DOCTOR, UserRole.FRONT_OFFICE])),
 ):
-    """Add buffer/waiting time to an appointment."""
+    """Add buffer/waiting time to an appointment. Allowed for both doctor and front office."""
     service = AppointmentService(db)
     appointment = service.add_buffer_time(appointment_id, minutes)
     return service.build_response(appointment)

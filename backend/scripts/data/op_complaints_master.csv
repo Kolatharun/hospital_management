@@ -1,0 +1,19 @@
+Code,Category,Complaint
+C001,Chest,Chest pain
+C002,Chest,Chest tightness / pressure
+C003,Chest,Burning sensation in chest
+C004,Chest,Pain radiating to left arm / neck / jaw / back
+C005,Breathing,Shortness of breath
+C006,Breathing,Breathlessness on exertion
+C007,Breathing,Orthopnea
+C008,Breathing,Paroxysmal nocturnal dyspnea (PND)
+C009,Rhythm,Palpitations
+C010,Neurological,Dizziness
+C011,Neurological,Giddiness
+C012,Neurological,Syncope (Fainting / blackouts)
+C013,General,Extreme fatigue / weakness
+C014,BP Related,High BP symptoms
+C015,BP Related,Low BP symptoms
+C016,BP Related,Headache related to BP
+C017,Associated,Excessive sweating
+C018,Associated,Nausea / vomiting with chest discomfort
