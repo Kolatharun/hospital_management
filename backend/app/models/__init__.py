@@ -39,6 +39,9 @@ from app.models.queue import LabQueueItem, PharmacyQueueItem, QueueStatus
 # Documents
 from app.models.document import PatientDocument
 
+# Master data tables
+from app.models.master_data import ComplaintMaster, DiagnosisMaster, LabTestMaster
+
 __all__ = [
     # Base
     "BaseModel",
@@ -75,4 +78,8 @@ __all__ = [
     "QueueStatus",
     # Documents
     "PatientDocument",
+    # Master Data
+    "ComplaintMaster",
+    "DiagnosisMaster",
+    "LabTestMaster",
 ]

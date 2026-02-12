@@ -35,6 +35,7 @@ from app.controllers.queue_controller import router as queue_router
 from app.controllers.prescription_controller import router as prescription_router
 from app.controllers.doctor_controller import router as doctor_router
 from app.controllers.document_controller import router as document_router
+from app.controllers.master_data_controller import router as master_router
 from app.schemas.common import HealthCheckResponse, ErrorResponse
 
 
@@ -223,6 +224,9 @@ app.include_router(doctor_router, prefix=settings.API_V1_PREFIX)
 
 # Phase 4 - Document Management
 app.include_router(document_router, prefix=settings.API_V1_PREFIX)
+
+# Master Data Management
+app.include_router(master_router, prefix=settings.API_V1_PREFIX)
 
 
 # ============================================================

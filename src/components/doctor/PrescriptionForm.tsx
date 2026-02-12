@@ -18,6 +18,7 @@ import prescriptionFooter from '@/assets/prescription-footer.jpeg';
 import vitalsService from '@/services/vitalsService';
 import documentService from '@/services/documentService';
 import prescriptionService from '@/services/prescriptionService';
+import masterDataService, { Complaint, Diagnosis, LabTest } from '@/services/masterDataService';
 import type { Document as PatientDocument } from '@/services/documentService';
 
 interface Medicine {
@@ -47,28 +48,6 @@ interface DraftData {
   savedAt: string;
 }
 
-const COMMON_DIAGNOSES = [
-  'Hypertension',
-  'Type 2 Diabetes',
-  'Coronary Artery Disease',
-  'Heart Failure',
-  'Atrial Fibrillation',
-  'Myocardial Infarction',
-  'Angina Pectoris',
-  'Cardiomyopathy',
-];
-
-const COMMON_COMPLAINTS = [
-  'Chest Pain',
-  'Shortness of Breath',
-  'Palpitations',
-  'Dizziness',
-  'Fatigue',
-  'Swelling in legs',
-  'High BP',
-  'Irregular heartbeat',
-];
-
 const COMMON_MEDICINES = [
   'Amlodipine',
   'Atorvastatin',
@@ -80,19 +59,6 @@ const COMMON_MEDICINES = [
   'Furosemide',
   'Carvedilol',
   'Digoxin',
-];
-
-const LAB_TESTS = [
-  'ECG',
-  'ECHO',
-  'TMT',
-  'HOLTER',
-  'ABPM',
-  'Lipid Profile',
-  'HbA1c',
-  'Thyroid Profile',
-  'Complete Blood Count',
-  'Kidney Function Test',
 ];
 
 const DRAFT_STORAGE_KEY = 'prescription_draft_';
@@ -157,9 +123,11 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
 
   // Form states
   const [diagnosisSearch, setDiagnosisSearch] = useState('');
+  const [diagnosisSuggestions, setDiagnosisSuggestions] = useState<Diagnosis[]>([]);
   const [diagnosis, setDiagnosis] = useState('');
   const [history, setHistory] = useState('NULL');
   const [complaintSearch, setComplaintSearch] = useState('');
+  const [complaintSuggestions, setComplaintSuggestions] = useState<Complaint[]>([]);
   const [complaint, setComplaint] = useState('');
 
   const [medicineSearch, setMedicineSearch] = useState('');
@@ -169,6 +137,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const [manualMedicines, setManualMedicines] = useState('');
 
   const [labSearch, setLabSearch] = useState('');
+  const [labSuggestions, setLabSuggestions] = useState<LabTest[]>([]);
   const [labTests, setLabTests] = useState('');
   const [advice, setAdvice] = useState('');
 
@@ -311,6 +280,61 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     }
   }, [diagnosis, complaint, medicines, labTests, advice, triggerAutoSave]);
 
+  // Fetch suggestions from backend
+  useEffect(() => {
+    const fetchDiagnosis = async () => {
+      if (diagnosisSearch.length >= 1) {
+        try {
+          const results = await masterDataService.searchDiagnosis(diagnosisSearch);
+          setDiagnosisSuggestions(results);
+        } catch (error) {
+          console.error('Failed to fetch diagnosis suggestions', error);
+        }
+      } else {
+        setDiagnosisSuggestions([]);
+      }
+    };
+
+    const timer = setTimeout(fetchDiagnosis, 300);
+    return () => clearTimeout(timer);
+  }, [diagnosisSearch]);
+
+  useEffect(() => {
+    const fetchComplaints = async () => {
+      if (complaintSearch.length >= 1) {
+        try {
+          const results = await masterDataService.searchComplaints(complaintSearch);
+          setComplaintSuggestions(results);
+        } catch (error) {
+          console.error('Failed to fetch complaint suggestions', error);
+        }
+      } else {
+        setComplaintSuggestions([]);
+      }
+    };
+
+    const timer = setTimeout(fetchComplaints, 300);
+    return () => clearTimeout(timer);
+  }, [complaintSearch]);
+
+  useEffect(() => {
+    const fetchLabTests = async () => {
+      if (labSearch.length >= 1) {
+        try {
+          const results = await masterDataService.searchLabTests(labSearch);
+          setLabSuggestions(results);
+        } catch (error) {
+          console.error('Failed to fetch lab suggestions', error);
+        }
+      } else {
+        setLabSuggestions([]);
+      }
+    };
+
+    const timer = setTimeout(fetchLabTests, 300);
+    return () => clearTimeout(timer);
+  }, [labSearch]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -320,21 +344,8 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     };
   }, []);
 
-  // Filter suggestions
-  const filteredDiagnoses = COMMON_DIAGNOSES.filter(d =>
-    d.toLowerCase().includes(diagnosisSearch.toLowerCase()) && diagnosisSearch.length >= 3
-  );
-
-  const filteredComplaints = COMMON_COMPLAINTS.filter(c =>
-    c.toLowerCase().includes(complaintSearch.toLowerCase()) && complaintSearch.length >= 3
-  );
-
   const filteredMedicines = COMMON_MEDICINES.filter(m =>
     m.toLowerCase().includes(medicineSearch.toLowerCase()) && medicineSearch.length >= 3
-  );
-
-  const filteredLabTests = LAB_TESTS.filter(l =>
-    l.toLowerCase().includes(labSearch.toLowerCase()) && labSearch.length >= 3
   );
 
   const handleAddMedicine = (medicineName?: string) => {
@@ -1162,15 +1173,18 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                   className="pl-10"
                 />
               </div>
-              {filteredDiagnoses.length > 0 && (
-                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm">
-                  {filteredDiagnoses.map(d => (
+              {diagnosisSuggestions.length > 0 && (
+                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm absolute z-10 w-full max-h-60 overflow-y-auto">
+                  {diagnosisSuggestions.map(d => (
                     <button
-                      key={d}
-                      onClick={() => handleSelectDiagnosis(d)}
-                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded"
+                      key={d.id}
+                      onClick={() => handleSelectDiagnosis(d.diagnosis)}
+                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded text-sm"
                     >
-                      {d}
+                      <div className="flex justify-between">
+                        <span>{d.diagnosis}</span>
+                        <span className="text-[10px] text-muted-foreground">{d.code}</span>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -1220,15 +1234,18 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                   <Mic className="w-4 h-4" />
                 </Button>
               </div>
-              {filteredComplaints.length > 0 && (
-                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm">
-                  {filteredComplaints.map(c => (
+              {complaintSuggestions.length > 0 && (
+                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm absolute z-10 w-full max-h-60 overflow-y-auto">
+                  {complaintSuggestions.map(c => (
                     <button
-                      key={c}
-                      onClick={() => handleSelectComplaint(c)}
-                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded"
+                      key={c.id}
+                      onClick={() => handleSelectComplaint(c.complaint)}
+                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded text-sm"
                     >
-                      {c}
+                      <div className="flex justify-between">
+                        <span>{c.complaint}</span>
+                        <span className="text-[10px] text-muted-foreground">{c.code}</span>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -1343,15 +1360,18 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 />
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               </div>
-              {filteredLabTests.length > 0 && (
-                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm">
-                  {filteredLabTests.map(l => (
+              {labSuggestions.length > 0 && (
+                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm absolute z-10 w-full max-h-60 overflow-y-auto">
+                  {labSuggestions.map(l => (
                     <button
-                      key={l}
-                      onClick={() => handleSelectLabTest(l)}
-                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded"
+                      key={l.id}
+                      onClick={() => handleSelectLabTest(l.test_name)}
+                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded text-sm"
                     >
-                      {l}
+                      <div className="flex justify-between">
+                        <span>{l.test_name}</span>
+                        <span className="text-[10px] text-muted-foreground">{l.code}</span>
+                      </div>
                     </button>
                   ))}
                 </div>
