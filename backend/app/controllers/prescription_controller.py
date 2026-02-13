@@ -12,7 +12,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_roles, get_current_doctor
+from app.core.security import decode_token
+from app.core.deps import get_current_user, get_current_user_optional, require_roles, get_current_doctor
 from app.models.user import User, UserRole
 from app.models.doctor import Doctor
 from app.services.prescription_service import PrescriptionService
@@ -139,10 +140,38 @@ def generate_prescription_pdf(
 @router.get("/{prescription_id}/download-pdf")
 def download_prescription_pdf(
     prescription_id: UUID,
+    token: Optional[str] = Query(None),
+    download: bool = Query(False),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    """Download prescription PDF. Generates if not already stored."""
+    """Download prescription PDF. Generates if not already stored.
+    
+    Accepts JWT token via query parameter to support <img> and <iframe> tags.
+    """
+    # If no current_user (from header), check token in query param
+    if not current_user:
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        
+        payload = decode_token(token)
+        if not payload or payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+        
+        user_id = payload.get("sub")
+        current_user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+
     service = PrescriptionService(db)
     try:
         pdf_path = service.get_pdf_path(prescription_id)
@@ -158,12 +187,11 @@ def download_prescription_pdf(
             detail="PDF file not found",
         )
 
-    filename = os.path.basename(pdf_path)
+    disposition = "attachment" if download else "inline"
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
-        filename=filename,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": disposition}
     )
 
 

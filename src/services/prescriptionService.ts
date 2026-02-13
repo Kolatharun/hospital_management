@@ -61,6 +61,19 @@ export interface PrescriptionUpdate {
   medicines?: Omit<Medicine, 'id' | 'sequence_order'>[];
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+export const getPrescriptionPdfUrl = (prescriptionId: string, download = false): string => {
+  if (!prescriptionId) return '';
+  const token = localStorage.getItem('access_token');
+  const baseUrl = `${API_BASE_URL}/prescriptions/${prescriptionId}/download-pdf`;
+  const params = new URLSearchParams();
+  if (token) params.append('token', token);
+  if (download) params.append('download', 'true');
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+};
+
 export const prescriptionService = {
   async create(data: PrescriptionCreate): Promise<Prescription> {
     return api.post<Prescription>('/prescriptions', data);

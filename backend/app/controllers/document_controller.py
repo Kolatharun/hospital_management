@@ -108,6 +108,7 @@ def get_appointment_documents(
 def get_document_file(
     document_id: UUID,
     token: Optional[str] = Query(None),
+    download: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """Serve the actual document file for viewing/download.
@@ -145,10 +146,11 @@ def get_document_file(
             detail="Document file not found on server",
         )
 
+    disposition = "attachment" if download else "inline"
     return FileResponse(
         path=document.file_path,
         media_type=document.file_type or "application/octet-stream",
-        filename=document.file_name,
+        headers={"Content-Disposition": disposition}
     )
 
 

@@ -7,16 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Upload, Camera, X, Search, User, Eye, Trash2, Image, Loader2, Save } from 'lucide-react';
+import { FileText, Upload, Camera, X, Search, User, Eye, Trash2, Image, Loader2, Save, Download } from 'lucide-react';
 import { appointmentService, Appointment } from '@/services/appointmentService';
 import { documentService, Document } from '@/services/documentService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
-const getDocumentFileUrl = (documentId: string): string => {
+const getDocumentFileUrl = (documentId: string, download = false): string => {
   if (!documentId) return '';
   const token = localStorage.getItem('access_token');
-  return `${API_BASE_URL}/documents/${documentId}/file${token ? `?token=${token}` : ''}`;
+  const baseUrl = `${API_BASE_URL}/documents/${documentId}/file`;
+  const params = new URLSearchParams();
+  if (token) params.append('token', token);
+  if (download) params.append('download', 'true');
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
 };
 
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'application/pdf'];
@@ -296,6 +301,16 @@ export function DocumentUpload() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleDownloadDocument = (doc: Document) => {
+    const url = getDocumentFileUrl(doc.id, true);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = doc.file_name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const deleteDocument = async (docId: string) => {
@@ -595,6 +610,13 @@ export function DocumentUpload() {
                               onClick={() => setPreviewDocument(doc)}
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDownloadDocument(doc)}
+                            >
+                              <Download className="w-4 h-4" />
                             </Button>
                             <Button
                               size="icon"

@@ -11,14 +11,19 @@ import { Search, User, Phone, Calendar, MapPin, FileText, History, Download, Pil
 import { patientService, Patient } from '@/services/patientService';
 import { appointmentService, Appointment } from '@/services/appointmentService';
 import { documentService, Document } from '@/services/documentService';
-import { prescriptionService, Prescription } from '@/services/prescriptionService';
+import { prescriptionService, Prescription, getPrescriptionPdfUrl } from '@/services/prescriptionService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
-const getDocumentFileUrl = (documentId: string): string => {
+const getDocumentFileUrl = (documentId: string, download = false): string => {
   if (!documentId) return '';
   const token = localStorage.getItem('access_token');
-  return `${API_BASE_URL}/documents/${documentId}/file${token ? `?token=${token}` : ''}`;
+  const baseUrl = `${API_BASE_URL}/documents/${documentId}/file`;
+  const params = new URLSearchParams();
+  if (token) params.append('token', token);
+  if (download) params.append('download', 'true');
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
 };
 
 export function PatientSearch() {
@@ -117,7 +122,7 @@ export function PatientSearch() {
   };
 
   const handleDownloadDocument = (doc: Document) => {
-    const url = getDocumentFileUrl(doc.id);
+    const url = getDocumentFileUrl(doc.id, true);
     const link = document.createElement('a');
     link.href = url;
     link.download = doc.file_name;
@@ -131,87 +136,13 @@ export function PatientSearch() {
   };
 
   const handleDownloadPrescription = (rx: Prescription) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({
-        title: 'Popup Blocked',
-        description: 'Please allow popups to download prescriptions.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const medicinesRows = rx.medicines?.map((med, idx) =>
-      `<tr>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center">${idx + 1}</td>
-        <td style="padding:8px;border:1px solid #ddd">${med.medicine_name}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.dosage || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.frequency || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center">${med.duration || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd">${med.instructions || '-'}</td>
-      </tr>`
-    ).join('') || '<tr><td colspan="6" style="padding:8px;text-align:center">No medicines</td></tr>';
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Prescription - ${rx.patient_name || 'Patient'}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-          .header { text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 16px; margin-bottom: 20px; }
-          .header h1 { color: #1a365d; margin: 0; }
-          .patient-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; padding: 12px; background: #f7fafc; border-radius: 8px; }
-          .patient-info div { font-size: 14px; }
-          .label { color: #718096; }
-          .value { font-weight: 600; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #1a365d; color: white; padding: 10px 8px; text-align: left; }
-          .section { margin-bottom: 16px; }
-          .section-title { font-weight: 600; color: #1a365d; margin-bottom: 4px; }
-          @media print { body { padding: 0; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Balaji Heart Center</h1>
-          <p>Prescription</p>
-        </div>
-        <div class="patient-info">
-          <div><span class="label">Patient: </span><span class="value">${rx.patient_name || '-'}</span></div>
-          <div><span class="label">MR Number: </span><span class="value">${rx.patient_mr_number || '-'}</span></div>
-          <div><span class="label">Age/Gender: </span><span class="value">${rx.patient_age_gender || '-'}</span></div>
-          <div><span class="label">Date: </span><span class="value">${formatDate(rx.created_at)}</span></div>
-          <div><span class="label">Doctor: </span><span class="value">${rx.doctor_name || '-'}</span></div>
-          <div><span class="label">OP Number: </span><span class="value">${rx.op_number || '-'}</span></div>
-        </div>
-        ${rx.diagnosis ? `<div class="section"><div class="section-title">Diagnosis</div><p>${rx.diagnosis}</p></div>` : ''}
-        ${rx.complaint ? `<div class="section"><div class="section-title">Complaint</div><p>${rx.complaint}</p></div>` : ''}
-        ${rx.history ? `<div class="section"><div class="section-title">History</div><p>${rx.history}</p></div>` : ''}
-        <div class="section">
-          <div class="section-title">Medicines</div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width:40px">#</th>
-                <th>Medicine</th>
-                <th style="width:80px">Dosage</th>
-                <th style="width:80px">Frequency</th>
-                <th style="width:80px">Duration</th>
-                <th>Instructions</th>
-              </tr>
-            </thead>
-            <tbody>${medicinesRows}</tbody>
-          </table>
-        </div>
-        ${rx.lab_tests ? `<div class="section"><div class="section-title">Lab Tests</div><p>${rx.lab_tests}</p></div>` : ''}
-        ${rx.advice ? `<div class="section"><div class="section-title">Advice</div><p>${rx.advice}</p></div>` : ''}
-        ${rx.follow_up_days ? `<div class="section"><div class="section-title">Follow Up</div><p>After ${rx.follow_up_days} days</p></div>` : ''}
-        <script>window.onload = function() { window.print(); }</script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const url = getPrescriptionPdfUrl(rx.id, true);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = rx.op_number ? `${rx.op_number}.pdf` : `prescription_${rx.id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -434,6 +365,7 @@ export function PatientSearch() {
                                 <p className="font-medium">{doc.document_type}</p>
                                 <p className="text-sm text-muted-foreground">
                                   {doc.file_name} • {formatDate(doc.created_at)}
+                                  {doc.uploaded_by_name && ` • Uploaded by ${doc.uploaded_by_name}`}
                                 </p>
                               </div>
                             </div>
@@ -476,7 +408,8 @@ export function PatientSearch() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <Pill className="w-4 h-4 text-primary" />
-                                    <p className="font-semibold">{rx.diagnosis || 'No diagnosis'}</p>
+                                    <p className="font-semibold">{rx.diagnosis || 'General Prescription'}</p>
+                                    <p className="text-xs font-mono text-muted-foreground">{rx.op_number || rx.id.substring(0, 8)}</p>
                                   </div>
                                   <p className="text-sm text-muted-foreground mt-1">
                                     {formatDate(rx.created_at)} • {rx.doctor_name || 'Doctor'}
@@ -646,114 +579,13 @@ export function PatientSearch() {
           </DialogHeader>
           {prescriptionPreview && (
             <div className="space-y-4">
-              {/* Patient & Doctor Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-secondary rounded-lg">
-                <div>
-                  <p className="text-xs text-muted-foreground">Patient</p>
-                  <p className="font-medium">{prescriptionPreview.patient_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">MR Number</p>
-                  <p className="font-medium font-mono">{prescriptionPreview.patient_mr_number || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Age / Gender</p>
-                  <p className="font-medium">{prescriptionPreview.patient_age_gender || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
-                  <p className="font-medium">{formatDate(prescriptionPreview.created_at)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Doctor</p>
-                  <p className="font-medium">{prescriptionPreview.doctor_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">OP Number</p>
-                  <p className="font-medium font-mono">{prescriptionPreview.op_number || '-'}</p>
-                </div>
+              <div className="rounded-lg overflow-hidden border bg-muted">
+                <iframe
+                  src={getPrescriptionPdfUrl(prescriptionPreview.id)}
+                  title={`Prescription - ${prescriptionPreview.op_number || prescriptionPreview.id}`}
+                  className="w-full h-[600px]"
+                />
               </div>
-
-              {/* Diagnosis */}
-              {prescriptionPreview.diagnosis && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">Diagnosis</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.diagnosis}</p>
-                </div>
-              )}
-
-              {/* Complaint */}
-              {prescriptionPreview.complaint && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">Complaint</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.complaint}</p>
-                </div>
-              )}
-
-              {/* History */}
-              {prescriptionPreview.history && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">History</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.history}</p>
-                </div>
-              )}
-
-              {/* Medicines Table */}
-              {prescriptionPreview.medicines && prescriptionPreview.medicines.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-2">Medicines</p>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-primary/10">
-                          <TableHead className="font-bold text-primary w-10">#</TableHead>
-                          <TableHead className="font-bold text-primary">Medicine</TableHead>
-                          <TableHead className="font-bold text-primary">Dosage</TableHead>
-                          <TableHead className="font-bold text-primary">Frequency</TableHead>
-                          <TableHead className="font-bold text-primary">Duration</TableHead>
-                          <TableHead className="font-bold text-primary">Instructions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {prescriptionPreview.medicines.map((med, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{idx + 1}</TableCell>
-                            <TableCell className="font-medium">{med.medicine_name}</TableCell>
-                            <TableCell>{med.dosage || '-'}</TableCell>
-                            <TableCell>{med.frequency || '-'}</TableCell>
-                            <TableCell>{med.duration || '-'}</TableCell>
-                            <TableCell>{med.instructions || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {/* Lab Tests */}
-              {prescriptionPreview.lab_tests && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">Lab Tests</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.lab_tests}</p>
-                </div>
-              )}
-
-              {/* Advice */}
-              {prescriptionPreview.advice && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">Advice</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">{prescriptionPreview.advice}</p>
-                </div>
-              )}
-
-              {/* Follow Up */}
-              {prescriptionPreview.follow_up_days && (
-                <div>
-                  <p className="text-sm font-semibold text-primary mb-1">Follow Up</p>
-                  <p className="text-sm p-3 bg-muted rounded-lg">After {prescriptionPreview.follow_up_days} days</p>
-                </div>
-              )}
 
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2 border-t">
