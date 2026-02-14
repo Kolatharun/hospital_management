@@ -43,7 +43,8 @@ class AppointmentService:
                 detail="Patient not found",
             )
 
-        # Verify doctor exists if provided
+        # Verify doctor exists if provided and get doctor's room
+        doctor = None
         if data.doctor_id:
             doctor = self.doctor_repo.get_by_id(data.doctor_id)
             if not doctor:
@@ -56,6 +57,9 @@ class AppointmentService:
         op_number = self.appointment_repo.generate_op_number(data.appointment_date)
         token_number = self.appointment_repo.get_next_token_number(data.appointment_date)
 
+        # Use doctor's room if no room explicitly provided
+        room = data.room if data.room else (doctor.room if doctor else None)
+
         appointment_data = {
             "op_number": op_number,
             "patient_id": data.patient_id,
@@ -63,7 +67,7 @@ class AppointmentService:
             "appointment_date": data.appointment_date,
             "appointment_time": data.appointment_time,
             "token_number": token_number,
-            "room": data.room,
+            "room": room,
             "notes": data.notes,
         }
 

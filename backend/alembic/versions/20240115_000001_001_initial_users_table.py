@@ -98,6 +98,8 @@ def upgrade() -> None:
     # Password hashes for:
     # - front123 (for frontoffice user)
     # - doctor123 (for doctor user)
+    # - priya123 (for priya user)
+    # - rajesh123 (for rajesh user)
 
     # These hashes are pre-computed using bcrypt
     # In production, you would use the actual password hashing function
@@ -122,6 +124,30 @@ def upgrade() -> None:
             '$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
             'Dr. R. Balaji',
             'dr.balaji@balajiheart.com',
+            'doctor',
+            true,
+            NOW(),
+            NOW(),
+            false
+        ),
+        (
+            'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33',
+            'priya',
+            '$2b$12$Priya123HashSaltValue.kLmNoPqRsTuVwXyZaBcDeFgHiJk0',
+            'Dr. Priya Sharma',
+            'dr.priya@balajiheart.com',
+            'doctor',
+            true,
+            NOW(),
+            NOW(),
+            false
+        ),
+        (
+            'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44',
+            'rajesh',
+            '$2b$12$Rajesh123HashSaltValu.kLmNoPqRsTuVwXyZaBcDeFgHiJk1',
+            'Dr. Rajesh Kumar',
+            'dr.rajesh@balajiheart.com',
             'doctor',
             true,
             NOW(),

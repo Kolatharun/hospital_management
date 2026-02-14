@@ -34,20 +34,22 @@ def upgrade() -> None:
     """))
 
     op.execute(text("""
-        INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee)
+        INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee, user_id)
         SELECT gen_random_uuid(), 'Dr. Priya Sharma',
                (SELECT id FROM departments WHERE code = 'CARD'),
                'Non-Invasive Cardiology', 'MD, DM (Cardiology)', 'MCI-12346',
-               '+91 9100079991', 'dr.priya@balajiheart.com', '2', 450.00
+               '+91 9100079991', 'dr.priya@balajiheart.com', '2', 450.00,
+               (SELECT id FROM users WHERE username = 'priya')
         WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12346')
     """))
 
     op.execute(text("""
-        INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee)
+        INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee, user_id)
         SELECT gen_random_uuid(), 'Dr. Rajesh Kumar',
                (SELECT id FROM departments WHERE code = 'GENM'),
                'Internal Medicine', 'MD (Medicine)', 'MCI-12347',
-               '+91 9100079992', 'dr.rajesh@balajiheart.com', '3', 300.00
+               '+91 9100079992', 'dr.rajesh@balajiheart.com', '3', 300.00,
+               (SELECT id FROM users WHERE username = 'rajesh')
         WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12347')
     """))
 
@@ -69,13 +71,29 @@ def upgrade() -> None:
         WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12349')
     """))
 
-    # Also link the existing doctor user to Dr. Balaji if not already linked
+    # Also link the existing doctor users to their respective doctors if not already linked
     op.execute(text("""
         UPDATE doctors
         SET user_id = (SELECT id FROM users WHERE username = 'doctor')
         WHERE registration_number = 'MCI-12345'
           AND user_id IS NULL
           AND EXISTS (SELECT 1 FROM users WHERE username = 'doctor')
+    """))
+
+    op.execute(text("""
+        UPDATE doctors
+        SET user_id = (SELECT id FROM users WHERE username = 'priya')
+        WHERE registration_number = 'MCI-12346'
+          AND user_id IS NULL
+          AND EXISTS (SELECT 1 FROM users WHERE username = 'priya')
+    """))
+
+    op.execute(text("""
+        UPDATE doctors
+        SET user_id = (SELECT id FROM users WHERE username = 'rajesh')
+        WHERE registration_number = 'MCI-12347'
+          AND user_id IS NULL
+          AND EXISTS (SELECT 1 FROM users WHERE username = 'rajesh')
     """))
 
 

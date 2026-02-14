@@ -12,6 +12,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,6 +25,41 @@ from app.services.vitals_service import VitalsService
 from app.schemas.appointment import AppointmentResponse, QueueStatsResponse
 
 router = APIRouter(prefix="/doctor", tags=["Doctor Dashboard"])
+
+
+class DoctorProfileResponse(BaseModel):
+    """Doctor profile response for prescription header."""
+    id: str
+    name: str
+    qualification: Optional[str] = None
+    registration_number: Optional[str] = None
+    speciality: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/profile", response_model=DoctorProfileResponse)
+def get_my_profile(
+    current_doctor: Doctor = Depends(get_current_doctor),
+):
+    """
+    Get current doctor's profile details.
+
+    Maps to: PrescriptionForm.tsx - Doctor header display
+    Returns doctor name, qualification, registration number, etc.
+    """
+    return DoctorProfileResponse(
+        id=str(current_doctor.id),
+        name=current_doctor.name,
+        qualification=current_doctor.qualification,
+        registration_number=current_doctor.registration_number,
+        speciality=current_doctor.speciality,
+        phone=current_doctor.phone,
+        email=current_doctor.email,
+    )
 
 
 @router.get("/queue", response_model=list[AppointmentResponse])

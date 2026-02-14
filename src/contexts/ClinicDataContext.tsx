@@ -229,7 +229,7 @@ function mapApiAppointmentToAppointment(apiApt: ApiAppointment, patients: Patien
     time: apiApt.appointment_time || '',
     status: apiApt.status as Appointment['status'],
     waitingTime: apiApt.waiting_time_minutes || 0,
-    room: apiApt.room || '1',
+    room: apiApt.room || undefined,
     notes: apiApt.notes || undefined,
     opNumber: apiApt.op_number,
     tokenNumber: apiApt.token_number,
@@ -318,7 +318,7 @@ function mapApiPharmacyQueueToPharmacyQueueItem(apiItem: ApiPharmacyQueueItem): 
 }
 
 export function ClinicDataProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -359,6 +359,9 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
+        // Filter appointments by doctor if user is a doctor
+        const doctorIdFilter = user?.role === 'doctor' && user?.doctorId ? user.doctorId : undefined;
+
         const [
           patientsData,
           appointmentsData,
@@ -369,7 +372,7 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
           doctorsData,
         ] = await Promise.all([
           patientService.getTodayRegistrations().catch(() => []),
-          appointmentService.getTodayAppointments().catch(() => []),
+          appointmentService.getTodayAppointments(doctorIdFilter).catch(() => []),
           prescriptionService.getTodayPrescriptions().catch(() => []),
           queueService.getLabQueue().catch(() => []),
           queueService.getPharmacyQueue().catch(() => []),
@@ -425,7 +428,9 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
 
   const refreshAppointments = useCallback(async () => {
     try {
-      const data = await appointmentService.getTodayAppointments();
+      // Filter appointments by doctor if user is a doctor
+      const doctorIdFilter = user?.role === 'doctor' && user?.doctorId ? user.doctorId : undefined;
+      const data = await appointmentService.getTodayAppointments(doctorIdFilter);
       const patientIds = new Set(patients.map(p => p.id));
 
       // Find patient IDs from appointments that aren't in current patients
@@ -452,7 +457,7 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
     }
-  }, [patients]);
+  }, [patients, user]);
 
   const refreshLabQueue = useCallback(async () => {
     try {

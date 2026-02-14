@@ -8,6 +8,16 @@ import { Vitals } from './vitalsService';
 import { Prescription } from './prescriptionService';
 import { Patient } from './patientService';
 
+export interface DoctorProfile {
+  id: string;
+  name: string;
+  qualification: string | null;
+  registration_number: string | null;
+  speciality: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export interface PatientHistory {
   patient: Patient;
   vitals: Vitals[];
@@ -24,6 +34,10 @@ export interface TodaySummary {
 }
 
 export const doctorService = {
+  async getMyProfile(): Promise<DoctorProfile> {
+    return api.get<DoctorProfile>('/doctor/profile');
+  },
+
   async getMyQueue(): Promise<Appointment[]> {
     return api.get<Appointment[]>('/doctor/queue');
   },

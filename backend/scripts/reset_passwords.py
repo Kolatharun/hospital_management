@@ -32,11 +32,25 @@ def reset_passwords():
             doc_user.password_hash = get_password_hash("doctor123")
             print("  ✓ Reset password for: doctor")
 
+        # Reset priya password
+        priya_user = db.query(User).filter(User.username == "priya").first()
+        if priya_user:
+            priya_user.password_hash = get_password_hash("priya123")
+            print("  ✓ Reset password for: priya")
+
+        # Reset rajesh password
+        rajesh_user = db.query(User).filter(User.username == "rajesh").first()
+        if rajesh_user:
+            rajesh_user.password_hash = get_password_hash("rajesh123")
+            print("  ✓ Reset password for: rajesh")
+
         db.commit()
         print("\n✓ Passwords reset successfully!")
         print("\nDemo Credentials:")
         print("  Front Office: frontoffice / front123")
-        print("  Doctor: doctor / doctor123")
+        print("  Doctor (Dr. R. Balaji): doctor / doctor123")
+        print("  Doctor (Dr. Priya Sharma): priya / priya123")
+        print("  Doctor (Dr. Rajesh Kumar): rajesh / rajesh123")
 
     except Exception as e:
         print(f"Error: {e}")

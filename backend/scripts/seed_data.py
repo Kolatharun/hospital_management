@@ -189,6 +189,8 @@ def seed_users(db: Session, doc_map: dict) -> None:
     # Check if users already exist
     existing_fo = db.query(User).filter(User.username == "frontoffice").first()
     existing_doc = db.query(User).filter(User.username == "doctor").first()
+    existing_priya = db.query(User).filter(User.username == "priya").first()
+    existing_rajesh = db.query(User).filter(User.username == "rajesh").first()
 
     users_created = 0
 
@@ -237,6 +239,64 @@ def seed_users(db: Session, doc_map: dict) -> None:
             balaji_doc.user_id = existing_doc.id
             print(f"  ✓ Linked existing doctor user to Dr. R. Balaji")
 
+    # Doctor user - link to Dr. Priya Sharma
+    if not existing_priya:
+        priya_user = User(
+            username="priya",
+            password_hash=get_password_hash("priya123"),
+            display_name="Dr. Priya Sharma",
+            email="dr.priya@balajiheart.com",
+            role=UserRole.DOCTOR,
+            is_active=True,
+        )
+        db.add(priya_user)
+        db.flush()  # Get the user ID
+
+        # Link the doctor record to this user (Doctor.user_id -> User.id)
+        priya_doc = doc_map.get("MCI-12346")
+        if priya_doc:
+            priya_doc.user_id = priya_user.id
+            print(f"  ✓ Linked doctor user to Dr. Priya Sharma (Doctor ID: {priya_doc.id})")
+
+        users_created += 1
+        print("  ✓ Created doctor user: priya / priya123")
+    else:
+        print("  - Dr. Priya Sharma user already exists")
+        # Still try to link existing user to doctor if not linked
+        priya_doc = doc_map.get("MCI-12346")
+        if priya_doc and not priya_doc.user_id:
+            priya_doc.user_id = existing_priya.id
+            print(f"  ✓ Linked existing doctor user to Dr. Priya Sharma")
+
+    # Doctor user - link to Dr. Rajesh Kumar
+    if not existing_rajesh:
+        rajesh_user = User(
+            username="rajesh",
+            password_hash=get_password_hash("rajesh123"),
+            display_name="Dr. Rajesh Kumar",
+            email="dr.rajesh@balajiheart.com",
+            role=UserRole.DOCTOR,
+            is_active=True,
+        )
+        db.add(rajesh_user)
+        db.flush()  # Get the user ID
+
+        # Link the doctor record to this user (Doctor.user_id -> User.id)
+        rajesh_doc = doc_map.get("MCI-12347")
+        if rajesh_doc:
+            rajesh_doc.user_id = rajesh_user.id
+            print(f"  ✓ Linked doctor user to Dr. Rajesh Kumar (Doctor ID: {rajesh_doc.id})")
+
+        users_created += 1
+        print("  ✓ Created doctor user: rajesh / rajesh123")
+    else:
+        print("  - Dr. Rajesh Kumar user already exists")
+        # Still try to link existing user to doctor if not linked
+        rajesh_doc = doc_map.get("MCI-12347")
+        if rajesh_doc and not rajesh_doc.user_id:
+            rajesh_doc.user_id = existing_rajesh.id
+            print(f"  ✓ Linked existing doctor user to Dr. Rajesh Kumar")
+
     if users_created > 0:
         db.commit()
         print(f"\n✓ Created {users_created} demo user(s)")
@@ -266,7 +326,9 @@ def main():
         print("=" * 50)
         print("\nDemo Credentials:")
         print("  Front Office: frontoffice / front123")
-        print("  Doctor: doctor / doctor123")
+        print("  Doctor (Dr. R. Balaji): doctor / doctor123")
+        print("  Doctor (Dr. Priya Sharma): priya / priya123")
+        print("  Doctor (Dr. Rajesh Kumar): rajesh / rajesh123")
         print("\nDepartments created: 10")
         print("Doctors created: 5")
     except Exception as e:

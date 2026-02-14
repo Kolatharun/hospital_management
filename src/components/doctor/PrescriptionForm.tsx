@@ -20,6 +20,7 @@ import vitalsService from '@/services/vitalsService';
 import documentService from '@/services/documentService';
 import prescriptionService from '@/services/prescriptionService';
 import masterDataService, { Complaint, Diagnosis, LabTest } from '@/services/masterDataService';
+import doctorService, { DoctorProfile } from '@/services/doctorService';
 import type { Document as PatientDocument } from '@/services/documentService';
 import { DocumentViewer } from './DocumentViewer';
 
@@ -174,12 +175,31 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const [patientHistory, setPatientHistory] = useState<Prescription[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Doctor profile state - fetched from backend based on logged-in doctor
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
+
   const patient = selectedAppointment?.patient;
 
   // Expose openDocuments method to parent via ref
   useImperativeHandle(ref, () => ({
     openDocuments: () => setShowDocumentsDialog(true),
   }));
+
+  // Fetch logged-in doctor's profile from backend
+  useEffect(() => {
+    const fetchDoctorProfile = async () => {
+      try {
+        const profile = await doctorService.getMyProfile();
+        setDoctorProfile(profile);
+      } catch {
+        // Fallback handled in UI - will show placeholder if profile not available
+      }
+    };
+
+    if (user?.role === 'doctor') {
+      fetchDoctorProfile();
+    }
+  }, [user]);
 
   // Fetch vitals from backend database when appointment is selected (with fallback support)
   useEffect(() => {
@@ -471,18 +491,22 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   };
 
   const handleSelectDiagnosis = (d: string) => {
-    setDiagnosis(prev => prev ? `${prev}, ${d}` : d);
+    setDiagnosis(prev => prev.trim() ? `${prev.trim()}\n${d}` : d);
     setDiagnosisSearch('');
   };
 
   const handleSelectComplaint = (c: string) => {
-    setComplaint(prev => prev ? `${prev}, ${c}` : c);
+    setComplaint(prev => prev.trim() ? `${prev.trim()}\n${c}` : c);
     setComplaintSearch('');
   };
 
   const handleSelectLabTest = (test: string) => {
-    setLabTests(prev => prev ? `${prev}, ${test}` : test);
+    setLabTests(prev => prev.trim() ? `${prev.trim()}\n${test}` : test);
     setLabSearch('');
+  };
+
+  const handleSelectMedicine = (medicineName: string) => {
+    setMedicineSearch(medicineName);
   };
 
   const getDocumentFileUrl = (doc: PatientDocument) => {
@@ -526,7 +550,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         advice: advice,
         vitals: vitals || undefined,
         notes: `${advice}\n\nLab Tests: ${labTests}`.trim() || undefined,
-        doctorName: user?.name || 'Dr. R. Balaji',
+        doctorName: doctorProfile?.name || user?.name || 'Doctor',
       });
 
       await updateAppointmentStatus(selectedAppointment.id, 'completed');
@@ -880,11 +904,11 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         <div class="tagline">30 Years Experience in Treating BP and Heart Diseases</div>
         <div class="header-content">
           <div class="dr-info">
-            <div class="dr-name">Dr. R. BALAJI</div>
-            <div class="dr-degree">MD, DM, FSCAI (USA) | Regd No: 19870</div>
-            <div class="dr-title">Senior Interventional Cardiologist</div>
+            <div class="dr-name">${doctorProfile?.name || user?.name || 'Doctor'}</div>
+            <div class="dr-degree">${doctorProfile?.qualification || ''}${doctorProfile?.registration_number ? ` | Regd No: ${doctorProfile.registration_number}` : ''}</div>
+            <div class="dr-title">${doctorProfile?.speciality || ''}</div>
             <div class="dr-hospital">Medicover Hospitals - Hitech City</div>
-            <div class="dr-contact-item"><span>&#9990;</span> +91 9848098307</div>
+            <div class="dr-contact-item"><span>&#9990;</span> ${doctorProfile?.phone || ''}</div>
             <div class="dr-contact-item"><span>&#127760;</span> www.balajiheartcenter.com</div>
             <div class="dr-contact-item"><span>&#128100;</span> www.facebook.com/balajiheartcenter</div>
           </div>
@@ -1112,9 +1136,11 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-xl text-destructive">Dr. R. BALAJI</p>
-                  <p className="text-xs text-muted-foreground">MD, DM, FSCAI (USA) | Regd No: 19870</p>
-                  <p className="text-sm font-medium">Senior Interventional Cardiologist</p>
+                  <p className="font-bold text-xl text-destructive">{doctorProfile?.name || user?.name || 'Doctor'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {doctorProfile?.qualification || ''}{doctorProfile?.registration_number ? ` | Regd No: ${doctorProfile.registration_number}` : ''}
+                  </p>
+                  <p className="text-sm font-medium">{doctorProfile?.speciality || ''}</p>
                 </div>
               </div>
             </CardContent>
@@ -1389,7 +1415,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                   {filteredMedicines.map(m => (
                     <button
                       key={m}
-                      onClick={() => handleAddMedicine(m)}
+                      onClick={() => handleSelectMedicine(m)}
                       className="block w-full text-left px-2 py-1 hover:bg-muted rounded"
                     >
                       {m}

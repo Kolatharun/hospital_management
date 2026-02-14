@@ -51,7 +51,7 @@ export function AppointmentQueue() {
       await refreshAppointments();
 
       const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`;
-      const roomNumber = appointment.room || '1';
+      const roomNumber = appointment.room || '-';
       const opNumber = appointment.opNumber || `OP-${appointment.tokenNumber}`;
 
       announcePatientCall(opNumber, patientName, roomNumber);
@@ -161,7 +161,7 @@ export function AppointmentQueue() {
             <div className="h-12 w-px bg-white/30" />
             <div>
               <p className="text-sm opacity-80">Room Number</p>
-              <p className="text-2xl font-bold">{currentPatient.room || '1'}</p>
+              <p className="text-2xl font-bold">{currentPatient.room || '-'}</p>
             </div>
           </div>
         </div>
@@ -301,7 +301,7 @@ export function AppointmentQueue() {
                           <TableCell className="font-medium">
                             {appointment.patient.firstName} {appointment.patient.lastName}
                           </TableCell>
-                          <TableCell>{appointment.room || '1'}</TableCell>
+                          <TableCell>{appointment.room || '-'}</TableCell>
                           <TableCell>
                             {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
                               <span className="flex items-center gap-1">
