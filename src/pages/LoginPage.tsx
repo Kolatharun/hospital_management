@@ -32,7 +32,7 @@ export default function LoginPage() {
   const roles = [
     {
       id: 'front-office' as UserRole,
-      title: 'Front Office',
+      title: 'Out Patient (OP)',
       description: 'Patient registration, appointments & billing',
       icon: Building2,
       username: 'frontoffice',
@@ -93,16 +93,14 @@ export default function LoginPage() {
                       key={role.id}
                       type="button"
                       onClick={() => handleQuickSelect(role.username)}
-                      className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${
-                        isSelected
+                      className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${isSelected
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
-                      }`}
+                        }`}
                     >
                       <Icon
-                        className={`w-6 h-6 mb-1 ${
-                          isSelected ? 'text-primary' : 'text-muted-foreground'
-                        }`}
+                        className={`w-6 h-6 mb-1 ${isSelected ? 'text-primary' : 'text-muted-foreground'
+                          }`}
                       />
                       <div className="font-semibold text-sm">{role.title}</div>
                       <div className="text-xs text-muted-foreground">{role.description}</div>

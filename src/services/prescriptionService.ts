@@ -87,8 +87,17 @@ export const prescriptionService = {
     return api.get<Prescription>(`/prescriptions/appointment/${appointmentId}`);
   },
 
-  async getPatientPrescriptions(patientId: string, skip = 0, limit = 20): Promise<Prescription[]> {
-    return api.get<Prescription[]>(`/prescriptions/patient/${patientId}?skip=${skip}&limit=${limit}`);
+  async getPatientPrescriptions(
+    patientId: string,
+    skip = 0,
+    limit = 20,
+    excludeAppointmentId?: string
+  ): Promise<Prescription[]> {
+    let url = `/prescriptions/patient/${patientId}?skip=${skip}&limit=${limit}`;
+    if (excludeAppointmentId) {
+      url += `&exclude_appointment_id=${excludeAppointmentId}`;
+    }
+    return api.get<Prescription[]>(url);
   },
 
   async getTodayPrescriptions(): Promise<Prescription[]> {

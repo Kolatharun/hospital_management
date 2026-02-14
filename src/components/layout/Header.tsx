@@ -9,7 +9,7 @@ export function Header() {
 
   if (!user) return null;
 
-  const roleLabel = user.role === 'doctor' ? 'Doctor' : 'Front Office';
+  const roleLabel = user.role === 'doctor' ? 'Doctor' : 'Out Patient (OP)';
   const roleIcon = user.role === 'doctor' ? Stethoscope : User;
   const RoleIcon = roleIcon;
 
@@ -19,9 +19,9 @@ export function Header() {
         <div className="flex items-center justify-between">
           {/* Logo & Clinic Name */}
           <div className="flex items-center gap-3">
-            <img 
-              src={logo} 
-              alt="Balaji Heart Center" 
+            <img
+              src={logo}
+              alt="Balaji Heart Center"
               className="h-10"
             />
           </div>

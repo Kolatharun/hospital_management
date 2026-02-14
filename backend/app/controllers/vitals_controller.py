@@ -15,6 +15,7 @@ from app.schemas.vitals import (
     VitalsCreate,
     VitalsUpdate,
     VitalsResponse,
+    VitalsWithFallbackResponse,
 )
 
 router = APIRouter(prefix="/vitals", tags=["Vitals"])
@@ -53,6 +54,24 @@ def get_appointment_vitals(
     service = VitalsService(db)
     vitals = service.get_by_appointment(appointment_id)
     return service.build_response(vitals)
+
+
+@router.get("/appointment/{appointment_id}/with-fallback", response_model=VitalsWithFallbackResponse)
+def get_appointment_vitals_with_fallback(
+    appointment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get vitals for an appointment with fallback to previous visits.
+
+    Logic:
+    1. If current OP has vitals -> return them (is_old_vitals=False)
+    2. If no vitals for current OP, check previous visits for same MR number
+    3. If previous vitals found -> return most recent (is_old_vitals=True)
+    4. If no vitals at all -> return has_vitals=False
+    """
+    service = VitalsService(db)
+    return service.get_vitals_with_fallback(appointment_id)
 
 
 @router.get("/patient/{patient_id}", response_model=list[VitalsResponse])

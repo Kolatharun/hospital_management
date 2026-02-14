@@ -69,11 +69,21 @@ def _calculate_age(dob) -> str:
 def generate_prescription_html(
     prescription: Prescription,
     vitals: Optional[PatientVitals] = None,
+    is_old_vitals: bool = False,
+    source_op_number: Optional[str] = None,
+    visit_date: Optional[str] = None,
 ) -> str:
     """Generate prescription HTML for PDF rendering via xhtml2pdf.
 
     Uses flat table layout (no thead/tfoot - xhtml2pdf has limited support).
     Matches the frontend PrescriptionForm.tsx print layout.
+
+    Args:
+        prescription: The prescription model
+        vitals: The vitals model (current or fallback from previous visit)
+        is_old_vitals: True if vitals are from a previous visit
+        source_op_number: The OP number from which old vitals were taken
+        visit_date: The date of the previous visit (ISO format)
     """
     patient = prescription.patient
     appointment = prescription.appointment
@@ -127,6 +137,21 @@ def generate_prescription_html(
     # Build header/footer HTML - use simple img tags, no thead/tfoot
     header_html = f'<img src="{header_src}" width="100%" />' if header_src else ""
     footer_html = f'<img src="{footer_src}" width="100%" />' if footer_src else ""
+
+    # Vitals section heading based on fallback status
+    vitals_heading_color = "#b45309" if is_old_vitals else "#8B0000"
+    vitals_heading_text = "Old Vitals (From Previous Visit)" if is_old_vitals else "Clinical Parameters"
+    vitals_source_html = ""
+    if is_old_vitals and source_op_number:
+        visit_date_str = ""
+        if visit_date:
+            try:
+                from datetime import datetime as dt
+                parsed_date = dt.fromisoformat(visit_date.replace("Z", "+00:00"))
+                visit_date_str = f" ({parsed_date.strftime('%d-%m-%Y')})"
+            except Exception:
+                visit_date_str = f" ({visit_date})"
+        vitals_source_html = f'<br/><span style="font-size: 9px; color: #92400e;">From: {_esc(source_op_number)}{visit_date_str}</span>'
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -279,6 +304,12 @@ def generate_prescription_html(
         <tr>
             <!-- LEFT: Vitals -->
             <td class="col-vitals">
+                <div style="margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">
+                    <span style="font-size: 11px; font-weight: bold; color: {vitals_heading_color};">
+                        {vitals_heading_text}
+                    </span>
+                    {vitals_source_html}
+                </div>
                 <table class="vitals-list">
                     <tr><td class="vl-label">SPO2:</td><td class="vl-value">{spo2}</td></tr>
                     <tr><td class="vl-label">PR:</td><td class="vl-value">{pulse}</td></tr>
@@ -335,14 +366,30 @@ def generate_prescription_html(
 def generate_prescription_pdf(
     prescription: Prescription,
     vitals: Optional[PatientVitals] = None,
+    is_old_vitals: bool = False,
+    source_op_number: Optional[str] = None,
+    visit_date: Optional[str] = None,
 ) -> str:
     """Generate prescription PDF and store in uploads/prescriptions/ folder.
 
     Returns the stored PDF file path.
+
+    Args:
+        prescription: The prescription model
+        vitals: The vitals model (current or fallback from previous visit)
+        is_old_vitals: True if vitals are from a previous visit
+        source_op_number: The OP number from which old vitals were taken
+        visit_date: The date of the previous visit (ISO format)
     """
     from xhtml2pdf import pisa
 
-    html = generate_prescription_html(prescription, vitals)
+    html = generate_prescription_html(
+        prescription,
+        vitals,
+        is_old_vitals=is_old_vitals,
+        source_op_number=source_op_number,
+        visit_date=visit_date,
+    )
 
     # Ensure prescriptions directory exists
     PRESCRIPTIONS_DIR.mkdir(parents=True, exist_ok=True)

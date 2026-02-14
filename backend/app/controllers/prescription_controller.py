@@ -85,12 +85,13 @@ def get_patient_prescriptions(
     patient_id: UUID,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    exclude_appointment_id: Optional[UUID] = Query(None, description="Exclude current appointment from history"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get prescription history for a patient."""
+    """Get prescription history for a patient (by MR number/patient_id), excluding current visit."""
     service = PrescriptionService(db)
-    prescriptions = service.get_patient_prescriptions(patient_id, skip, limit)
+    prescriptions = service.get_patient_prescriptions(patient_id, skip, limit, exclude_appointment_id)
     return [service.build_response(p) for p in prescriptions]
 
 

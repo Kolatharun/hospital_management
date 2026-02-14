@@ -54,6 +54,14 @@ export interface VitalsCreate {
   current_drugs?: string;
 }
 
+export interface VitalsWithFallback {
+  vitals: Vitals | null;
+  is_old_vitals: boolean;
+  source_op_number: string | null;
+  visit_date: string | null;
+  has_vitals: boolean;
+}
+
 export const vitalsService = {
   async record(data: VitalsCreate): Promise<Vitals> {
     return api.post<Vitals>('/vitals', data);
@@ -65,6 +73,10 @@ export const vitalsService = {
 
   async getByAppointment(appointmentId: string): Promise<Vitals> {
     return api.get<Vitals>(`/vitals/appointment/${appointmentId}`);
+  },
+
+  async getByAppointmentWithFallback(appointmentId: string): Promise<VitalsWithFallback> {
+    return api.get<VitalsWithFallback>(`/vitals/appointment/${appointmentId}/with-fallback`);
   },
 
   async getPatientHistory(patientId: string, skip = 0, limit = 20): Promise<Vitals[]> {

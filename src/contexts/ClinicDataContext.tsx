@@ -378,6 +378,24 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
         ]);
 
         const mappedPatients = patientsData.map(mapApiPatientToPatient);
+        const patientIds = new Set(mappedPatients.map(p => p.id));
+
+        // Find patient IDs from appointments that aren't in today's registrations
+        const missingPatientIds = appointmentsData
+          .map(apt => apt.patient_id)
+          .filter(id => !patientIds.has(id));
+        const uniqueMissingIds = [...new Set(missingPatientIds)];
+
+        // Fetch full data for missing patients
+        if (uniqueMissingIds.length > 0) {
+          const missingPatientsData = await Promise.all(
+            uniqueMissingIds.map(id => patientService.getById(id).catch(() => null))
+          );
+          missingPatientsData.forEach(p => {
+            if (p) mappedPatients.push(mapApiPatientToPatient(p));
+          });
+        }
+
         setPatients(mappedPatients);
         setAppointments(appointmentsData.map(apt => mapApiAppointmentToAppointment(apt, mappedPatients)));
         setPrescriptions(prescriptionsData.map(mapApiPrescriptionToPrescription));
@@ -408,7 +426,29 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
   const refreshAppointments = useCallback(async () => {
     try {
       const data = await appointmentService.getTodayAppointments();
-      setAppointments(data.map(apt => mapApiAppointmentToAppointment(apt, patients)));
+      const patientIds = new Set(patients.map(p => p.id));
+
+      // Find patient IDs from appointments that aren't in current patients
+      const missingPatientIds = data
+        .map(apt => apt.patient_id)
+        .filter(id => !patientIds.has(id));
+      const uniqueMissingIds = [...new Set(missingPatientIds)];
+
+      let updatedPatients = patients;
+      if (uniqueMissingIds.length > 0) {
+        const missingPatientsData = await Promise.all(
+          uniqueMissingIds.map(id => patientService.getById(id).catch(() => null))
+        );
+        const newPatients = missingPatientsData
+          .filter((p): p is ApiPatient => p !== null)
+          .map(mapApiPatientToPatient);
+        if (newPatients.length > 0) {
+          updatedPatients = [...patients, ...newPatients];
+          setPatients(updatedPatients);
+        }
+      }
+
+      setAppointments(data.map(apt => mapApiAppointmentToAppointment(apt, updatedPatients)));
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
     }

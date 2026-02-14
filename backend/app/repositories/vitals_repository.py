@@ -60,3 +60,25 @@ class VitalsRepository(BaseRepository[PatientVitals]):
             PatientVitals.appointment_id == appointment_id,
             PatientVitals.is_deleted == False,
         ).first() is not None
+
+    def get_most_recent_patient_vitals(
+        self,
+        patient_id: UUID,
+        exclude_appointment_id: Optional[UUID] = None,
+    ) -> Optional[PatientVitals]:
+        """Get the most recent vitals for a patient, optionally excluding a specific appointment.
+
+        Used for fallback when current appointment has no vitals.
+        """
+        query = self.db.query(PatientVitals).options(
+            joinedload(PatientVitals.patient),
+            joinedload(PatientVitals.appointment),
+        ).filter(
+            PatientVitals.patient_id == patient_id,
+            PatientVitals.is_deleted == False,
+        )
+
+        if exclude_appointment_id:
+            query = query.filter(PatientVitals.appointment_id != exclude_appointment_id)
+
+        return query.order_by(PatientVitals.created_at.desc()).first()

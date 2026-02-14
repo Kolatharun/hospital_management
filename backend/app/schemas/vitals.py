@@ -125,3 +125,19 @@ class TodayVitalsResponse(BaseModel):
 
     items: List[VitalsResponse]
     total: int
+
+
+class VitalsWithFallbackResponse(BaseModel):
+    """Vitals response with fallback information.
+
+    Used when current OP has no vitals but previous visits do.
+    """
+
+    vitals: Optional[VitalsResponse] = None
+    is_old_vitals: bool = False
+    source_op_number: Optional[str] = None
+    visit_date: Optional[str] = None
+    has_vitals: bool = False
+
+    class Config:
+        from_attributes = True

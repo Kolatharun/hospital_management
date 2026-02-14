@@ -81,3 +81,9 @@ logs/
 # Database
 *.db
 *.sqlite3
+
+# Ignore uploaded patient documents
+uploads/documents/
+
+# Ignore generated prescription PDFs/images
+uploads/prescriptions/

@@ -12,7 +12,7 @@ from app.repositories.vitals_repository import VitalsRepository
 from app.repositories.appointment_repository import AppointmentRepository
 from app.models.vitals import PatientVitals
 from app.models.user import User
-from app.schemas.vitals import VitalsCreate, VitalsUpdate, VitalsResponse
+from app.schemas.vitals import VitalsCreate, VitalsUpdate, VitalsResponse, VitalsWithFallbackResponse
 
 
 class VitalsService:
@@ -123,6 +123,62 @@ class VitalsService:
             "items": [self.build_response(v) for v in vitals],
             "total": len(vitals),
         }
+
+    def get_vitals_with_fallback(self, appointment_id: UUID) -> VitalsWithFallbackResponse:
+        """Get vitals for an appointment with fallback to previous visits.
+
+        Logic:
+        1. Check if current OP has vitals -> return them (is_old_vitals=False)
+        2. If no vitals for current OP, check for previous visits' vitals
+        3. If previous vitals found -> return most recent (is_old_vitals=True)
+        4. If no vitals at all -> return empty response (has_vitals=False)
+        """
+        # Step 1: Try to get vitals for current appointment
+        current_vitals = self.vitals_repo.get_by_appointment(appointment_id)
+
+        if current_vitals:
+            # Current OP has vitals - return normally
+            return VitalsWithFallbackResponse(
+                vitals=self.build_response(current_vitals),
+                is_old_vitals=False,
+                source_op_number=None,
+                visit_date=None,
+                has_vitals=True,
+            )
+
+        # Step 2: No vitals for current OP - get appointment to find patient_id
+        appointment = self.appointment_repo.get_with_details(appointment_id)
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Appointment not found",
+            )
+
+        # Step 3: Try to get most recent vitals from previous visits
+        previous_vitals = self.vitals_repo.get_most_recent_patient_vitals(
+            patient_id=appointment.patient_id,
+            exclude_appointment_id=appointment_id,
+        )
+
+        if previous_vitals:
+            # Found previous vitals - return with fallback info
+            prev_appointment = previous_vitals.appointment
+            return VitalsWithFallbackResponse(
+                vitals=self.build_response(previous_vitals),
+                is_old_vitals=True,
+                source_op_number=prev_appointment.op_number if prev_appointment else None,
+                visit_date=prev_appointment.appointment_date.isoformat() if prev_appointment and prev_appointment.appointment_date else None,
+                has_vitals=True,
+            )
+
+        # Step 4: No vitals found at all for this patient
+        return VitalsWithFallbackResponse(
+            vitals=None,
+            is_old_vitals=False,
+            source_op_number=None,
+            visit_date=None,
+            has_vitals=False,
+        )
 
     def build_response(self, vitals: PatientVitals) -> VitalsResponse:
         """Build vitals response."""

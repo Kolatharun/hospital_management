@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { useClinicData, Appointment, PatientVitals } from '@/contexts/ClinicDataContext';
+import { useClinicData, Appointment, PatientVitals, Prescription } from '@/contexts/ClinicDataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,11 +15,13 @@ import { FilePlus, User, Plus, Trash2, Save, Printer, Search, Clock, Mic, Send, 
 import html2pdf from 'html2pdf.js';
 import prescriptionHeader from '@/assets/prescription-header.jpeg';
 import prescriptionFooter from '@/assets/prescription-footer.jpeg';
+import logo from '@/assets/logo.jpeg';
 import vitalsService from '@/services/vitalsService';
 import documentService from '@/services/documentService';
 import prescriptionService from '@/services/prescriptionService';
 import masterDataService, { Complaint, Diagnosis, LabTest } from '@/services/masterDataService';
 import type { Document as PatientDocument } from '@/services/documentService';
+import { DocumentViewer } from './DocumentViewer';
 
 interface Medicine {
   name: string;
@@ -100,8 +102,25 @@ function clearDraft(appointmentId: string) {
   }
 }
 
+function calculateAge(dob: string | undefined): string {
+  if (!dob) return '-';
+  try {
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return '-';
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 0 ? String(age) : '-';
+  } catch {
+    return '-';
+  }
+}
+
 export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionFormProps>(function PrescriptionForm({ selectedAppointment, onComplete }, ref) {
-  const { addPrescription, updateAppointmentStatus, getAppointmentVitals, getPatientPrescriptions, addToLabQueue, addToPharmacyQueue } = useClinicData();
+  const { addPrescription, updateAppointmentStatus, getAppointmentVitals, addToLabQueue, addToPharmacyQueue } = useClinicData();
   const { user } = useAuth();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
@@ -110,22 +129,26 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const [activeTab, setActiveTab] = useState('prescription');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
 
-  // Vitals state - fetched from backend DB
+  // Vitals state - fetched from backend DB with fallback support
   const [vitals, setVitals] = useState<PatientVitals | null>(null);
   const [vitalsLoading, setVitalsLoading] = useState(false);
+  const [isOldVitals, setIsOldVitals] = useState(false);
+  const [sourceOpNumber, setSourceOpNumber] = useState<string | null>(null);
+  const [vitalsVisitDate, setVitalsVisitDate] = useState<string | null>(null);
+  const [hasVitals, setHasVitals] = useState(false);
 
   // Documents state
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [showDocumentsDialog, setShowDocumentsDialog] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<PatientDocument | null>(null);
-  const [documentZoom, setDocumentZoom] = useState(100);
+  const [selectedDocumentIndex, setSelectedDocumentIndex] = useState(0);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
 
   // Form states
   const [diagnosisSearch, setDiagnosisSearch] = useState('');
   const [diagnosisSuggestions, setDiagnosisSuggestions] = useState<Diagnosis[]>([]);
   const [diagnosis, setDiagnosis] = useState('');
-  const [history, setHistory] = useState('NULL');
+  const [history, setHistory] = useState('');
   const [complaintSearch, setComplaintSearch] = useState('');
   const [complaintSuggestions, setComplaintSuggestions] = useState<Complaint[]>([]);
   const [complaint, setComplaint] = useState('');
@@ -147,32 +170,45 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
 
+  // Patient history state - fetched from API (all previous visits)
+  const [patientHistory, setPatientHistory] = useState<Prescription[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const patient = selectedAppointment?.patient;
-  const patientHistory = selectedAppointment ? getPatientPrescriptions(selectedAppointment.patientId) : [];
 
   // Expose openDocuments method to parent via ref
   useImperativeHandle(ref, () => ({
     openDocuments: () => setShowDocumentsDialog(true),
   }));
 
-  // Fetch vitals from backend database when appointment is selected
+  // Fetch vitals from backend database when appointment is selected (with fallback support)
   useEffect(() => {
     if (!selectedAppointment) return;
 
     const fetchVitals = async () => {
       setVitalsLoading(true);
+      // Reset fallback state
+      setIsOldVitals(false);
+      setSourceOpNumber(null);
+      setVitalsVisitDate(null);
+      setHasVitals(false);
+
       try {
-        // First try from context (local state)
+        // First try from context (local state) for current appointment only
         const localVitals = getAppointmentVitals(selectedAppointment.id);
         if (localVitals) {
           setVitals(localVitals);
+          setIsOldVitals(false);
+          setHasVitals(true);
           setVitalsLoading(false);
           return;
         }
 
-        // Fetch from backend API
-        const apiVitals = await vitalsService.getByAppointment(selectedAppointment.id);
-        if (apiVitals) {
+        // Fetch from backend API with fallback support
+        const response = await vitalsService.getByAppointmentWithFallback(selectedAppointment.id);
+
+        if (response.has_vitals && response.vitals) {
+          const apiVitals = response.vitals;
           setVitals({
             id: apiVitals.id,
             appointmentId: apiVitals.appointment_id,
@@ -197,10 +233,19 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
             recordedAt: apiVitals.created_at,
             recordedBy: apiVitals.recorded_by || '',
           });
+          setIsOldVitals(response.is_old_vitals);
+          setSourceOpNumber(response.source_op_number);
+          setVitalsVisitDate(response.visit_date);
+          setHasVitals(true);
+        } else {
+          // No vitals found at all for this patient
+          setVitals(null);
+          setHasVitals(false);
         }
       } catch {
-        // Vitals may not exist yet for this appointment
+        // API error - no vitals available
         setVitals(null);
+        setHasVitals(false);
       } finally {
         setVitalsLoading(false);
       }
@@ -228,6 +273,70 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     fetchDocuments();
   }, [selectedAppointment]);
 
+  // Fetch patient prescription history from backend API (all past visits, excluding current)
+  useEffect(() => {
+    if (!selectedAppointment) {
+      setPatientHistory([]);
+      return;
+    }
+
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        // Fetch all prescriptions for this patient (by patient_id/MR number), excluding current appointment
+        const historyData = await prescriptionService.getPatientPrescriptions(
+          selectedAppointment.patientId,
+          0,
+          50,
+          selectedAppointment.id // Exclude current appointment
+        );
+
+        // Map API response to local Prescription format
+        const mappedHistory: Prescription[] = historyData.map(rx => ({
+          id: rx.id,
+          patientId: rx.patient_id,
+          appointmentId: rx.appointment_id,
+          diagnosis: rx.diagnosis,
+          complaint: rx.complaint || undefined,
+          history: rx.history || undefined,
+          medicines: rx.medicines.map(m => ({
+            name: m.medicine_name,
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            duration: m.duration || '',
+          })),
+          labTests: rx.lab_tests || undefined,
+          advice: rx.advice || undefined,
+          notes: rx.notes || undefined,
+          createdAt: rx.created_at,
+          doctorName: rx.doctor_name || '',
+          sentToPatient: rx.sent_to_patient,
+          sentVia: rx.sent_via as 'whatsapp' | 'email' | undefined,
+        }));
+
+        setPatientHistory(mappedHistory);
+
+        // Populate history field from previous complaints
+        if (mappedHistory.length > 0) {
+          const previousComplaints = mappedHistory
+            .filter(rx => rx.complaint && rx.complaint.trim())
+            .map(rx => rx.complaint!.trim())
+            .join('; ');
+          setHistory(previousComplaints || 'No previous visit history available');
+        } else {
+          setHistory('No previous visit history available');
+        }
+      } catch {
+        setPatientHistory([]);
+        setHistory('No previous visit history available');
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [selectedAppointment]);
+
   // Load draft from localStorage when appointment is selected
   useEffect(() => {
     if (!selectedAppointment || draftLoaded) return;
@@ -235,7 +344,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     const draft = loadDraft(selectedAppointment.id);
     if (draft) {
       setDiagnosis(draft.diagnosis || '');
-      setHistory(draft.history || 'NULL');
+      // History is populated from API - don't override from draft
       setComplaint(draft.complaint || '');
       setMedicines(draft.medicines || []);
       setManualMedicines(draft.manualMedicines || '');
@@ -613,302 +722,275 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
 
   const buildPrescriptionHTML = () => {
     const formatDate = (d: Date) => {
+      if (!d) return '-';
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
       return `${day}-${month}-${year}`;
     };
 
-    const headerImgSrc = prescriptionHeader;
-    const footerImgSrc = prescriptionFooter;
     const pdfFileName = getPDFFileName();
 
-    // Build treatment text
-    let treatmentText = '';
-    if (medicines.length > 0) {
-      treatmentText = medicines.map(m => {
-        let line = m.name;
-        if (m.dosage) line += ` (${m.dosage})`;
-        if (m.days) line += ` - ${m.days} days`;
-        return line;
-      }).join('\n');
-    }
+    let treatmentText = medicines.map(m => {
+      let line = m.name;
+      if (m.dosage) line += ` (${m.dosage})`;
+      if (m.days) line += ` - ${m.days} days`;
+      return line;
+    }).join('\n');
     if (manualMedicines.trim()) {
       treatmentText += (treatmentText ? '\n' : '') + manualMedicines.trim();
     }
 
+    const logoSrc = logo;
+
     return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>${pdfFileName} - ${patient?.firstName} ${patient?.lastName}</title>
+  <meta charset="UTF-8">
+  <title>${pdfFileName}</title>
   <style>
     @page {
       size: A4;
       margin: 0;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      font-family: Arial, Helvetica, sans-serif;
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body {
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
       font-size: 13px;
       color: #222;
       background: #fff;
+      line-height: 1.4;
     }
 
-    /* === Page structure with repeating header/footer === */
-    table.page-table {
+    /* Repeating Header/Footer structure */
+    table.print-container {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
     }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
     tbody { display: table-row-group; }
 
-    .header-cell { padding: 0; }
-    .footer-cell { padding: 0; }
-    .body-cell { padding: 20px 30px 10px 30px; vertical-align: top; }
+    .header-cell { padding: 30px 45px 5px 45px; }
+    .footer-cell { padding: 5px 45px 30px 45px; }
+    .body-cell { padding: 10px 45px; vertical-align: top; }
 
-    .header-img {
-      width: 100%;
-      display: block;
-    }
-    .footer-img {
-      width: 100%;
-      display: block;
-    }
+    /* Clinic Header */
+    .tagline { text-align: center; color: #8B0000; font-size: 11px; margin-bottom: 12px; font-weight: 500; font-style: italic; }
+    .header-content { display: flex; justify-content: space-between; align-items: flex-start; }
+    .dr-info { flex: 1; }
+    .dr-name { color: #222; font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+    .dr-degree { color: #666; font-size: 13px; margin-bottom: 8px; }
+    .dr-title { color: #222; font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .dr-hospital { color: #666; font-size: 13px; margin-bottom: 10px; }
+    .dr-contact-item { font-size: 11px; color: #444; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+    .logo-container { width: 170px; text-align: right; }
+    .logo-img { width: 100%; max-height: 90px; object-fit: contain; }
+    .maroon-line { border-bottom: 3.5px solid #8B0000; margin-top: 12px; }
 
-    /* === Patient Info Table === */
-    .patient-info-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid #bbb;
-      margin-bottom: 20px;
+    /* Patient Info Box */
+    .patient-box {
+      border: 1.5px solid #d1d5db;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-top: 25px;
+      margin-bottom: 25px;
     }
-    .patient-info-table td {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      vertical-align: top;
-    }
-    .pi-label {
-      color: #8B0000;
-      font-size: 11px;
-      font-weight: bold;
-      text-transform: uppercase;
-      display: block;
-      margin-bottom: 2px;
-    }
-    .pi-value {
-      font-size: 14px;
-      font-weight: bold;
-      display: block;
-    }
+    .p-grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1fr; gap: 12px 20px; }
+    .p-item { display: flex; flex-direction: column; }
+    .p-label { color: #8B0000; font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+    .p-value { font-size: 14px; font-weight: 700; color: #000; }
 
-    /* === Two Column Layout === */
-    .two-col-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .two-col-table td {
-      vertical-align: top;
-      padding: 0;
-    }
-    .col-vitals {
-      width: 220px;
-      padding-right: 20px;
-    }
-    .col-prescription {
-      padding-left: 20px;
-      border-left: 1px solid #ddd;
+    /* Layout for Vitals & Rx */
+    .main-layout { display: flex; min-height: 600px; }
+    .sidebar { width: 215px; border-right: 1.5px solid #e5e7eb; padding-right: 20px; flex-shrink: 0; }
+    .content { flex: 1; padding-left: 25px; }
+
+    .v-row { display: flex; justify-content: space-between; padding: 4.5px 0; align-items: baseline; }
+    .v-label { color: #000; font-weight: 700; font-size: 13px; width: 110px; }
+    .v-value { color: #333; font-size: 13px; font-weight: 500; flex: 1; text-align: left; }
+
+    .rx-sec { margin-bottom: 22px; }
+    .rx-sec-title { color: #000; font-weight: 700; font-size: 14px; margin-bottom: 5px; }
+    .rx-sec-val { color: #333; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+
+    /* Fixed Footer placement */
+    .footer-wrapper {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 190px;
+      padding: 5px 45px 30px 45px;
+      background: white;
+      z-index: 1000;
     }
 
-    /* === Vitals List === */
-    .vitals-list {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .vitals-list td {
-      padding: 4px 0;
-      vertical-align: top;
-      font-size: 13px;
-    }
-    .vl-label {
-      font-weight: bold;
-      color: #333;
-      white-space: nowrap;
-      padding-right: 12px;
-      width: 120px;
-    }
-    .vl-value {
-      color: #444;
+    .tfoot-spacer {
+      height: 190px;
     }
 
-    /* === Prescription Sections === */
-    .rx-section-title {
-      font-size: 13px;
-      font-weight: bold;
-      color: #333;
-      margin-top: 12px;
-      margin-bottom: 4px;
-    }
-    .rx-section-title:first-child {
-      margin-top: 0;
-    }
-    .rx-section-content {
-      font-size: 13px;
-      color: #444;
-      line-height: 1.5;
-      margin-bottom: 8px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
+    /* Footer Details Refinement */
+    .footer-divider { border-top: 1px solid #e5e7eb; margin-bottom: 12px; }
+    .services-row { color: #8B0000; font-weight: 500; font-size: 14px; text-align: center; margin-bottom: 8px; font-family: 'Arial', sans-serif; letter-spacing: 1px; word-spacing: 20px; }
+    .timings-row { text-align: center; font-size: 13px; margin-bottom: 8px; color: #333; }
+    .timings-row b { color: #8B0000; font-weight: 700; }
+    
+    .medicover-line { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+    .outline-heart { color: #8B0000; font-size: 18px; margin-right: 2px; }
+    .medicover-text { color: #022b4d; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; }
+    .hospital-text { color: #888; font-weight: 500; font-size: 13px; text-transform: uppercase; }
+    .location-text { color: #888; font-weight: 500; font-size: 13px; }
 
+    .address-box { font-size: 11.5px; color: #777; text-align: center; max-width: 700px; margin: 0 auto 10px; line-height: 1.4; }
+    .appointment-call { text-align: center; font-weight: 700; font-size: 13px; color: #000; }
+
+    /* Print Tweaks */
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { -webkit-print-color-adjust: exact; }
+      .v-row, .rx-sec, .p-item { break-inside: avoid; }
+      .footer-wrapper { position: fixed; bottom: 0; }
     }
   </style>
 </head>
 <body>
-  <table class="page-table">
+  <div class="footer-wrapper">
+    <div class="footer-divider"></div>
+    <div class="services-row">ECG &nbsp; ECHO &nbsp; TMT &nbsp; HOLTER &nbsp; ABPM</div>
+    <div class="timings-row">
+      <b>Chanda Nagar :</b> Morning : 8.30 am to 10.30 am, <b>Evening</b> 6.30 pm to 9.30 pm
+    </div>
+    <div class="medicover-line">
+       <span class="outline-heart">&#9825;</span>
+       <span class="medicover-text">MEDICOVER</span>
+       <span class="hospital-text">HOSPITALS</span>
+       <span class="location-text">Hitech City</span>
+    </div>
+    <div class="address-box">
+      SVL Towers, Ground Floor, Opp. Anu Furniture, Beside Narayana Junior Collage, Chanda Nagar<br/>
+      Hyderabad - 500 050, Telangana Email: balajiheartcenter.hyd@gmail.com
+    </div>
+    <div class="appointment-call">For Appointment: +91 9100079990 / 9010278278 / 040-2303 2345</div>
+  </div>
+
+  <table class="print-container">
     <thead>
       <tr><td class="header-cell">
-        <img src="${headerImgSrc}" alt="Header" class="header-img" />
+        <div class="tagline">30 Years Experience in Treating BP and Heart Diseases</div>
+        <div class="header-content">
+          <div class="dr-info">
+            <div class="dr-name">Dr. R. BALAJI</div>
+            <div class="dr-degree">MD, DM, FSCAI (USA) | Regd No: 19870</div>
+            <div class="dr-title">Senior Interventional Cardiologist</div>
+            <div class="dr-hospital">Medicover Hospitals - Hitech City</div>
+            <div class="dr-contact-item"><span>&#9990;</span> +91 9848098307</div>
+            <div class="dr-contact-item"><span>&#127760;</span> www.balajiheartcenter.com</div>
+            <div class="dr-contact-item"><span>&#128100;</span> www.facebook.com/balajiheartcenter</div>
+          </div>
+          <div class="logo-container">
+            <img src="${logoSrc}" class="logo-img" alt="Clinic Logo" />
+          </div>
+        </div>
+        <div class="maroon-line"></div>
       </td></tr>
     </thead>
     <tfoot>
-      <tr><td class="footer-cell">
-        <img src="${footerImgSrc}" alt="Footer" class="footer-img" />
-      </td></tr>
+      <tr><td class="tfoot-spacer"></td></tr>
     </tfoot>
     <tbody>
       <tr><td class="body-cell">
+        
+        <!-- Patient Profile Box -->
+        <div class="patient-box">
+          <div class="p-grid">
+            <div class="p-item">
+              <span class="p-label">MR. No:</span>
+              <span class="p-value">${patient?.mrNumber || '-'}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">DATE:</span>
+              <span class="p-value">${formatDate(new Date())}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">Patient Name:</span>
+              <span class="p-value">${patient?.firstName || ''} ${patient?.lastName || ''}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">Gender/Age:</span>
+              <span class="p-value">${patient?.gender || '-'} / ${calculateAge(patient?.dateOfBirth)}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">OP No:</span>
+              <span class="p-value">${formatOPNumber()}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">Weight:</span>
+              <span class="p-value">${vitals?.weight ? vitals.weight + " Kg's" : '-'}</span>
+            </div>
+            <div class="p-item">
+              <span class="p-label">Mobile No:</span>
+              <span class="p-value">${patient?.phone || '-'}</span>
+            </div>
+          </div>
+        </div>
 
-        <!-- Patient Info -->
-        <table class="patient-info-table">
-          <tr>
-            <td>
-              <span class="pi-label">MR. No:</span>
-              <span class="pi-value">${patient?.mrNumber || '-'}</span>
-            </td>
-            <td>
-              <span class="pi-label">DATE:</span>
-              <span class="pi-value">${formatDate(new Date())}</span>
-            </td>
-            <td>
-              <span class="pi-label">Patient Name:</span>
-              <span class="pi-value">${patient?.firstName || ''} ${patient?.lastName || ''}</span>
-            </td>
-            <td>
-              <span class="pi-label">Gender/Age:</span>
-              <span class="pi-value">${patient?.gender || '-'} / ${patient?.dateOfBirth ? new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear() : '-'}</span>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <span class="pi-label">OP No:</span>
-              <span class="pi-value">${formatOPNumber()}</span>
-            </td>
-            <td>
-              <span class="pi-label">Weight:</span>
-              <span class="pi-value">${vitals?.weight ? vitals.weight + " Kg's" : '-'}</span>
-            </td>
-            <td>
-              <span class="pi-label">Mobile No:</span>
-              <span class="pi-value">${patient?.phone || '-'}</span>
-            </td>
-            <td></td>
-          </tr>
-        </table>
+        <div class="main-layout">
+          <!-- Left Sidebar: Vitals (Only first page content will exist here) -->
+          <div class="sidebar">
+            ${vitals ? `
+            <div style="margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #e5e7eb;">
+              <span style="font-size: 11px; font-weight: 700; color: ${isOldVitals ? '#b45309' : '#8B0000'};">
+                ${isOldVitals ? 'Old Vitals (From Previous Visit)' : 'Clinical Parameters'}
+              </span>
+              ${isOldVitals && sourceOpNumber ? `<br/><span style="font-size: 9px; color: #92400e;">From: ${sourceOpNumber}${vitalsVisitDate ? ` (${new Date(vitalsVisitDate).toLocaleDateString('en-IN')})` : ''}</span>` : ''}
+            </div>
+            ` : ''}
+            <div class="v-row"><span class="v-label">SPO2:</span> <span class="v-value">${vitals?.spo2 || ''}%</span></div>
+            <div class="v-row"><span class="v-label">PR:</span> <span class="v-value">${vitals?.pulse || ''} mm/mt</span></div>
+            <div class="v-row"><span class="v-label">CVS:</span> <span class="v-value">${vitals?.cvs || ''}</span></div>
+            <div class="v-row"><span class="v-label">RS:</span> <span class="v-value">${vitals?.rs || ''}</span></div>
+            <div class="v-row"><span class="v-label">JVP:</span> <span class="v-value">${vitals?.jvp || ''}</span></div>
+            <div class="v-row"><span class="v-label">BP:</span> <span class="v-value">${vitals?.bloodPressure || ''}</span></div>
+            <div class="v-row"><span class="v-label">HTN:</span> <span class="v-value">${vitals?.htn || '-'}</span></div>
+            <div class="v-row"><span class="v-label">DM:</span> <span class="v-value">${vitals?.dm || '-'}</span></div>
+            <div class="v-row"><span class="v-label">SMOKING:</span> <span class="v-value">${vitals?.smoking || '-'}</span></div>
+            <div class="v-row"><span class="v-label">THYROID:</span> <span class="v-value">-</span></div>
+            <div class="v-row"><span class="v-label">HLP:</span> <span class="v-value">${vitals?.hlp || ''}</span></div>
+            <div class="v-row"><span class="v-label">F H/O CAD:</span> <span class="v-value">${vitals?.familyHOCAD || ''}</span></div>
+            <div class="v-row"><span class="v-label">HEART DISEASE:</span> <span class="v-value">${vitals?.heartDisease || ''}</span></div>
+            <div class="v-row"><span class="v-label">PTCA/CABG:</span> <span class="v-value">${vitals?.ptcaCabg || ''}</span></div>
+            <div class="v-row"><span class="v-label">DRUGS:</span> <span class="v-value">${vitals?.currentDrugs || ''}</span></div>
+          </div>
 
-        <!-- Two Column: Vitals Left | Prescription Right -->
-        <table class="two-col-table">
-          <tr>
-            <!-- LEFT: Vitals -->
-            <td class="col-vitals">
-              <table class="vitals-list">
-                <tr>
-                  <td class="vl-label">SPO2:</td>
-                  <td class="vl-value">${vitals?.spo2 ? vitals.spo2 + ' %' : '%'}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">PR:</td>
-                  <td class="vl-value">${vitals?.pulse ? vitals.pulse + ' mm/mt' : 'mm/mt'}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">CVS:</td>
-                  <td class="vl-value">${vitals?.cvs || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">RS:</td>
-                  <td class="vl-value">${vitals?.rs || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">JVP:</td>
-                  <td class="vl-value">${vitals?.jvp || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">BP:</td>
-                  <td class="vl-value">${vitals?.bloodPressure || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">HTN:</td>
-                  <td class="vl-value">${vitals?.htn || '-'}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">DM:</td>
-                  <td class="vl-value">${vitals?.dm || '-'}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">SMOKING:</td>
-                  <td class="vl-value">${vitals?.smoking || '-'}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">THYROID:</td>
-                  <td class="vl-value"></td>
-                </tr>
-                <tr>
-                  <td class="vl-label">HLP:</td>
-                  <td class="vl-value">${vitals?.hlp || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">F H/O CAD:</td>
-                  <td class="vl-value">${vitals?.familyHOCAD || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">HEART DISEASE:</td>
-                  <td class="vl-value">${vitals?.heartDisease || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">PTCA/CABG:</td>
-                  <td class="vl-value">${vitals?.ptcaCabg || ''}</td>
-                </tr>
-                <tr>
-                  <td class="vl-label">DRUGS:</td>
-                  <td class="vl-value">${vitals?.currentDrugs || ''}</td>
-                </tr>
-              </table>
-            </td>
-
-            <!-- RIGHT: Prescription -->
-            <td class="col-prescription">
-              <div class="rx-section-title">Complaint:</div>
-              <div class="rx-section-content">${complaint || '-'}</div>
-
-              <div class="rx-section-title">History:</div>
-              <div class="rx-section-content">${history && history !== 'NULL' ? history : '-'}</div>
-
-              <div class="rx-section-title">Treatment:</div>
-              <div class="rx-section-content">${treatmentText || '-'}</div>
-
-              <div class="rx-section-title">Diagnosis:</div>
-              <div class="rx-section-content">${diagnosis || '-'}</div>
-
-              <div class="rx-section-title">Advice:</div>
-              <div class="rx-section-content">${advice || '-'}</div>
-
-              <div class="rx-section-title">Lab/Investigation:</div>
-              <div class="rx-section-content">${labTests || '-'}</div>
-            </td>
-          </tr>
-        </table>
+          <!-- Right Content: Flowable Prescription sections -->
+          <div class="content">
+            <div class="rx-sec">
+              <div class="rx-sec-title">Complaint:</div>
+              <div class="rx-sec-val">${complaint || '-'}</div>
+            </div>
+            <div class="rx-sec">
+              <div class="rx-sec-title">History:</div>
+              <div class="rx-sec-val">${history && history !== 'NULL' ? history : '-'}</div>
+            </div>
+            <div class="rx-sec">
+              <div class="rx-sec-title">Treatment:</div>
+              <div class="rx-sec-val">${treatmentText || '-'}</div>
+            </div>
+            <div class="rx-sec">
+              <div class="rx-sec-title">Diagnosis:</div>
+              <div class="rx-sec-val">${diagnosis || '-'}</div>
+            </div>
+            <div class="rx-sec">
+              <div class="rx-sec-title">Advice:</div>
+              <div class="rx-sec-val">${advice || '-'}</div>
+            </div>
+            <div class="rx-sec">
+              <div class="rx-sec-title">Lab/Investigation:</div>
+              <div class="rx-sec-val">${labTests || '-'}</div>
+            </div>
+          </div>
+        </div>
 
       </td></tr>
     </tbody>
@@ -1057,9 +1139,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 <div>
                   <p className="text-xs text-destructive font-medium">Gender/Age:</p>
                   <p className="font-bold">
-                    {patient?.gender} / {patient?.dateOfBirth
-                      ? new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()
-                      : '-'}
+                    {patient?.gender || '-'} / {calculateAge(patient?.dateOfBirth)}
                   </p>
                 </div>
                 <div>
@@ -1074,13 +1154,20 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
             </CardContent>
           </Card>
 
-          {/* Vitals Display (Read-only from Database) */}
-          <Card className="mb-4 bg-primary/5 border-primary/20">
+          {/* Vitals Display (Read-only from Database with Fallback Support) */}
+          <Card className={`mb-4 ${isOldVitals ? 'bg-amber-50 border-amber-300' : 'bg-primary/5 border-primary/20'}`}>
             <CardContent className="py-3">
-              <p className="text-sm font-semibold text-primary mb-2">
-                Clinical Parameters (From Database)
-                {vitalsLoading && <span className="ml-2 text-muted-foreground animate-pulse">Loading...</span>}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`text-sm font-semibold ${isOldVitals ? 'text-amber-700' : 'text-primary'}`}>
+                  {isOldVitals ? 'Old Vitals (From Previous Visit)' : 'Clinical Parameters'}
+                  {vitalsLoading && <span className="ml-2 text-muted-foreground animate-pulse">Loading...</span>}
+                </p>
+                {isOldVitals && sourceOpNumber && (
+                  <div className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded">
+                    From: {sourceOpNumber} {vitalsVisitDate && `(${new Date(vitalsVisitDate).toLocaleDateString('en-IN')})`}
+                  </div>
+                )}
+              </div>
               {vitals ? (
                 <>
                   <div className="grid grid-cols-7 gap-3 text-xs mb-3">
@@ -1153,7 +1240,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 </>
               ) : (
                 <div className="text-xs text-muted-foreground py-2">
-                  {vitalsLoading ? 'Fetching vitals from database...' : 'No vitals recorded for this appointment.'}
+                  {vitalsLoading ? 'Fetching vitals from database...' : 'No vitals recorded for this patient.'}
                 </div>
               )}
             </CardContent>
@@ -1208,12 +1295,8 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
               <Textarea
                 placeholder="Enter patient history..."
                 value={history}
-                onChange={(e) => {
-                  setHistory(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
-                className="mt-1 min-h-[60px] resize-none overflow-hidden"
+                readOnly
+                className="mt-1 min-h-[60px] resize-none overflow-hidden bg-muted font-mono text-muted-foreground cursor-not-allowed"
                 rows={2}
               />
             </div>
@@ -1508,7 +1591,14 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          {patientHistory.length === 0 ? (
+          {historyLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Clock className="w-12 h-12 mx-auto mb-4 opacity-50 animate-pulse" />
+                <p>Loading patient history...</p>
+              </CardContent>
+            </Card>
+          ) : patientHistory.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -1568,7 +1658,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         </TabsContent>
       </Tabs>
 
-      {/* Documents Viewer Dialog */}
+      {/* Documents List Dialog */}
       <Dialog open={showDocumentsDialog} onOpenChange={setShowDocumentsDialog}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
@@ -1578,169 +1668,87 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
             </DialogTitle>
           </DialogHeader>
 
-          {selectedDocument ? (
-            <div className="flex flex-col flex-1 overflow-hidden">
-              {/* Document viewer toolbar */}
-              <div className="flex items-center justify-between p-3 bg-muted rounded-t-lg border-b">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedDocument(null)}
-                    className="gap-1"
-                  >
-                    <X className="w-4 h-4" />
-                    Back to list
-                  </Button>
-                  <span className="text-sm font-medium">{selectedDocument.file_name}</span>
-                  <Badge variant="secondary">{selectedDocument.document_type}</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDocumentZoom(Math.max(25, documentZoom - 25))}
-                    disabled={documentZoom <= 25}
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </Button>
-                  <span className="text-sm font-medium min-w-[50px] text-center">{documentZoom}%</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDocumentZoom(Math.min(300, documentZoom + 25))}
-                    disabled={documentZoom >= 300}
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDocumentZoom(100)}
-                  >
-                    Reset
-                  </Button>
-                </div>
+          <div className="flex-1 overflow-auto">
+            {documentsLoading ? (
+              <div className="text-center py-12 text-muted-foreground animate-pulse">
+                Loading documents...
               </div>
-
-              {/* Document viewer */}
-              <div className="flex-1 overflow-auto bg-gray-100 p-4 flex justify-center">
-                {selectedDocument.file_type?.startsWith('image/') ? (
-                  <img
-                    src={getDocumentFileUrl(selectedDocument)}
-                    alt={selectedDocument.file_name}
-                    style={{
-                      transform: `scale(${documentZoom / 100})`,
-                      transformOrigin: 'top center',
-                      maxWidth: 'none',
-                      transition: 'transform 0.2s ease',
-                    }}
-                    className="shadow-lg rounded"
-                  />
-                ) : selectedDocument.file_type === 'application/pdf' ? (
-                  <iframe
-                    src={getDocumentFileUrl(selectedDocument)}
-                    title={selectedDocument.file_name}
-                    style={{
-                      width: `${documentZoom}%`,
-                      height: '100%',
-                      minHeight: '500px',
-                      border: 'none',
-                      transition: 'width 0.2s ease',
-                    }}
-                    className="bg-white shadow-lg rounded"
-                  />
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Preview not available for this file type.</p>
-                    <a
-                      href={getDocumentFileUrl(selectedDocument)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline mt-2 inline-block"
-                    >
-                      Download to view
-                    </a>
-                  </div>
-                )}
+            ) : documents.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No documents uploaded for this patient.</p>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto">
-              {documentsLoading ? (
-                <div className="text-center py-12 text-muted-foreground animate-pulse">
-                  Loading documents...
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No documents uploaded for this patient.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-2">
-                  {documents.map((doc) => (
-                    <Card
-                      key={doc.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/40"
-                      onClick={() => {
-                        setSelectedDocument(doc);
-                        setDocumentZoom(100);
-                      }}
-                    >
-                      <CardContent className="p-3">
-                        {/* Thumbnail */}
-                        <div className="h-32 bg-muted rounded mb-2 overflow-hidden flex items-center justify-center">
-                          {doc.file_type?.startsWith('image/') ? (
-                            <img
-                              src={getDocumentFileUrl(doc)}
-                              alt={doc.file_name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <FileText className="w-12 h-12 text-muted-foreground" />
-                          )}
-                        </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-2">
+                {documents.map((doc, idx) => (
+                  <Card
+                    key={doc.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/40"
+                    onClick={() => {
+                      setSelectedDocumentIndex(idx);
+                      setShowDocumentViewer(true);
+                    }}
+                  >
+                    <CardContent className="p-3">
+                      {/* Thumbnail */}
+                      <div className="h-32 bg-muted rounded mb-2 overflow-hidden flex items-center justify-center">
+                        {doc.file_type?.startsWith('image/') ? (
+                          <img
+                            src={getDocumentFileUrl(doc)}
+                            alt={doc.file_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FileText className="w-12 h-12 text-muted-foreground" />
+                        )}
+                      </div>
 
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium truncate" title={doc.file_name}>
-                            {doc.file_name}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <Badge variant="secondary" className="text-xs">
-                              {doc.document_type}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {doc.file_size_formatted || `${Math.round(doc.file_size / 1024)} KB`}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(doc.created_at).toLocaleDateString('en-IN')}
-                          </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium truncate" title={doc.file_name}>
+                          {doc.file_name}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary" className="text-xs">
+                            {doc.document_type}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {doc.file_size_formatted || `${Math.round(doc.file_size / 1024)} KB`}
+                          </span>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(doc.created_at).toLocaleDateString('en-IN')}
+                        </p>
+                      </div>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2 gap-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedDocument(doc);
-                            setDocumentZoom(100);
-                          }}
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2 gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDocumentIndex(idx);
+                          setShowDocumentViewer(true);
+                        }}
+                      >
+                        <Eye className="w-3 h-3" />
+                        View
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Full-screen Document Viewer */}
+      <DocumentViewer
+        documents={documents}
+        initialIndex={selectedDocumentIndex}
+        isOpen={showDocumentViewer}
+        onClose={() => setShowDocumentViewer(false)}
+      />
     </div>
   );
 });

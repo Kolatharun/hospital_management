@@ -111,9 +111,12 @@ class PrescriptionService:
         patient_id: UUID,
         skip: int = 0,
         limit: int = 20,
+        exclude_appointment_id: Optional[UUID] = None,
     ) -> List[Prescription]:
-        """Get prescription history for a patient."""
-        return self.prescription_repo.get_patient_prescriptions(patient_id, skip, limit)
+        """Get prescription history for a patient, excluding current visit."""
+        return self.prescription_repo.get_patient_prescriptions(
+            patient_id, skip, limit, exclude_appointment_id
+        )
 
     def get_doctor_prescriptions(
         self,
@@ -222,17 +225,45 @@ class PrescriptionService:
         """Generate prescription PDF and store in uploads/prescriptions/ folder.
 
         Returns the stored PDF file path.
+        Uses vitals fallback logic: current OP vitals first, then previous visit vitals.
         """
         from app.utils.prescription_generator import generate_prescription_pdf
+        from app.services.vitals_service import VitalsService
 
         prescription = self.get_prescription(prescription_id)
 
-        # Fetch vitals for the appointment
+        # Fetch vitals with fallback logic
         vitals = None
-        if prescription.appointment_id:
-            vitals = self.vitals_repo.get_by_appointment(prescription.appointment_id)
+        is_old_vitals = False
+        source_op_number = None
+        visit_date = None
 
-        return generate_prescription_pdf(prescription, vitals)
+        if prescription.appointment_id:
+            vitals_service = VitalsService(self.db)
+            fallback_result = vitals_service.get_vitals_with_fallback(prescription.appointment_id)
+
+            if fallback_result.has_vitals and fallback_result.vitals:
+                # Get the actual model object for PDF generation
+                if fallback_result.is_old_vitals:
+                    # Get from previous appointment
+                    vitals = self.vitals_repo.get_most_recent_patient_vitals(
+                        patient_id=prescription.patient_id,
+                        exclude_appointment_id=prescription.appointment_id,
+                    )
+                    is_old_vitals = True
+                    source_op_number = fallback_result.source_op_number
+                    visit_date = fallback_result.visit_date
+                else:
+                    # Get from current appointment
+                    vitals = self.vitals_repo.get_by_appointment(prescription.appointment_id)
+
+        return generate_prescription_pdf(
+            prescription,
+            vitals,
+            is_old_vitals=is_old_vitals,
+            source_op_number=source_op_number,
+            visit_date=visit_date,
+        )
 
     def get_pdf_path(self, prescription_id: UUID) -> str:
         """Get path to an existing prescription PDF, or generate if missing."""

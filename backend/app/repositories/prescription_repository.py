@@ -47,16 +47,22 @@ class PrescriptionRepository(BaseRepository[Prescription]):
         patient_id: UUID,
         skip: int = 0,
         limit: int = 20,
+        exclude_appointment_id: Optional[UUID] = None,
     ) -> List[Prescription]:
-        """Get prescriptions for a patient."""
-        return self.db.query(Prescription).options(
+        """Get prescriptions for a patient, optionally excluding current appointment."""
+        query = self.db.query(Prescription).options(
             joinedload(Prescription.doctor),
             joinedload(Prescription.appointment),
             joinedload(Prescription.medicines),
         ).filter(
             Prescription.patient_id == patient_id,
             Prescription.is_deleted == False,
-        ).order_by(Prescription.created_at.desc()).offset(skip).limit(limit).all()
+        )
+
+        if exclude_appointment_id:
+            query = query.filter(Prescription.appointment_id != exclude_appointment_id)
+
+        return query.order_by(Prescription.created_at.desc()).offset(skip).limit(limit).all()
 
     def get_doctor_prescriptions(
         self,
