@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useClinicData } from '@/contexts/ClinicDataContext';
+import { useClinicData, Patient } from '@/contexts/ClinicDataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { User, Phone, Save, RotateCcw, X, Stethoscope, Search, History, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { User, Phone, Save, RotateCcw, X, Stethoscope, Search, History, Calendar, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import patientService, { Patient as ApiPatient } from '@/services/patientService';
 import appointmentService from '@/services/appointmentService';
+import { RegistrationToBillingData } from '@/pages/FrontOfficeDashboard';
 
 // Validation error display component
 interface ValidationErrorProps {
@@ -175,8 +176,12 @@ interface HistoryAppointment {
   token_number: number;
 }
 
-export function PatientRegistration() {
-  const { addPatient, addAppointment, patients, appointments, departments, doctors } = useClinicData();
+interface PatientRegistrationProps {
+  onRegistrationComplete?: (data: RegistrationToBillingData) => void;
+}
+
+export function PatientRegistration({ onRegistrationComplete }: PatientRegistrationProps) {
+  const { addPatient, patients, appointments, departments, doctors } = useClinicData();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('new');
@@ -520,7 +525,7 @@ export function PatientRegistration() {
     setIsSubmitting(true);
 
     try {
-      let patientToUse = selectedExistingPatient;
+      let patientToUse: Patient = selectedExistingPatient as Patient;
 
       if (!patientToUse) {
         patientToUse = await addPatient({
@@ -543,30 +548,33 @@ export function PatientRegistration() {
       // Get selected doctor info
       const selectedDoctor = doctors.find(doc => doc.id === formData.preferredDoctor) || doctors[0];
 
-      // Create today's appointment
-      const today = new Date().toISOString().split('T')[0];
-      const now = new Date();
-      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      // If callback is provided, redirect to billing (new flow)
+      // Queue entry will happen after billing is completed
+      if (onRegistrationComplete) {
+        toast({
+          title: 'Registration Successful',
+          description: `Patient ${patientToUse.firstName} ${patientToUse.lastName} (${patientToUse.mrNumber}) registered. Redirecting to billing...`,
+        });
 
-      await addAppointment({
-        patientId: patientToUse.id,
-        patient: patientToUse,
-        doctorId: selectedDoctor?.id || '',
-        doctorName: selectedDoctor?.name || '',
-        date: today,
-        time,
-        status: 'waiting',
-        waitingTime: 0,
-        room: '1',
-      });
+        // Pass patient data to billing
+        onRegistrationComplete({
+          patient: patientToUse,
+          doctorId: selectedDoctor?.id || '',
+          doctorName: selectedDoctor?.name || '',
+        });
 
-      toast({
-        title: 'Registration Successful',
-        description: `Patient ${patientToUse.firstName} ${patientToUse.lastName} (${patientToUse.mrNumber}) registered and added to queue.`,
-      });
+        // Reset form
+        handleClear();
+      } else {
+        // Fallback: Legacy behavior - show success message only
+        toast({
+          title: 'Registration Successful',
+          description: `Patient ${patientToUse.firstName} ${patientToUse.lastName} (${patientToUse.mrNumber}) registered successfully.`,
+        });
 
-      // Reset form
-      handleClear();
+        // Reset form
+        handleClear();
+      }
     } catch (error) {
       toast({
         title: 'Registration Failed',
@@ -935,9 +943,9 @@ export function PatientRegistration() {
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Save className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" />
                 )}
-                Save & Add to Queue
+                Save & Next
               </Button>
               <Button type="button" variant="outline" onClick={handleClear} className="gap-2">
                 <RotateCcw className="w-4 h-4" />
@@ -1124,9 +1132,9 @@ export function PatientRegistration() {
                     {isSubmitting ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Save className="w-4 h-4" />
+                      <ArrowRight className="w-4 h-4" />
                     )}
-                    Add to Today's Queue
+                    Proceed to Billing
                   </Button>
                 </div>
               )}

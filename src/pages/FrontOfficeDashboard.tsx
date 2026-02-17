@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { TabNavigation } from '@/components/layout/TabNavigation';
@@ -10,10 +10,18 @@ import { VitalsCollection } from '@/components/frontoffice/VitalsCollection';
 import { DocumentUpload } from '@/components/frontoffice/DocumentUpload';
 import { BillsList } from '@/components/frontoffice/BillsList';
 import { DayPayments } from '@/components/frontoffice/DayPayments';
+import { Patient } from '@/contexts/ClinicDataContext';
 
 import { ClipboardList, Users, Search, IndianRupee, Activity, Tv, FileText, Receipt, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+
+// Interface for patient data passed from registration to billing
+export interface RegistrationToBillingData {
+  patient: Patient;
+  doctorId: string;
+  doctorName: string;
+}
 
 const tabs = [
   {
@@ -60,13 +68,31 @@ const tabs = [
 
 export default function FrontOfficeDashboard() {
   const [activeTab, setActiveTab] = useState('registration');
+  // State to hold patient data when redirecting from registration to billing
+  const [pendingBillingPatient, setPendingBillingPatient] = useState<RegistrationToBillingData | null>(null);
+
+  // Callback for PatientRegistration to redirect to billing with patient data
+  const handleRegistrationComplete = useCallback((data: RegistrationToBillingData) => {
+    setPendingBillingPatient(data);
+    setActiveTab('billing');
+  }, []);
+
+  // Callback for BillingSection to clear the pending patient after billing is done
+  const handleBillingComplete = useCallback(() => {
+    setPendingBillingPatient(null);
+  }, []);
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'registration':
-        return <PatientRegistration />;
+        return <PatientRegistration onRegistrationComplete={handleRegistrationComplete} />;
       case 'billing':
-        return <BillingSection />;
+        return (
+          <BillingSection
+            pendingPatient={pendingBillingPatient}
+            onBillingComplete={handleBillingComplete}
+          />
+        );
       case 'vitals':
         return <VitalsCollection />;
       case 'documents':

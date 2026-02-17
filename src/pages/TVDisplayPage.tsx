@@ -1,14 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useClinicData } from '@/contexts/ClinicDataContext';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { Clock, Stethoscope, RefreshCw, Volume2 } from 'lucide-react';
+import { RefreshCw, Volume2 } from 'lucide-react';
 import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
 import logo from '@/assets/logo.jpeg';
 
 export default function TVDisplayPage() {
   const { getTodayAppointments } = useClinicData();
-  const { announcePatientCall } = useVoiceAnnouncement();
+  const { announcePatientCall, teluguVoiceAvailable, teluguVoiceName } = useVoiceAnnouncement();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastAnnouncedId, setLastAnnouncedId] = useState<string | null>(null);
@@ -35,16 +33,6 @@ export default function TVDisplayPage() {
   const todayAppointments = getTodayAppointments();
   const waitingPatients = todayAppointments.filter(a => a.status === 'waiting');
   const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress');
-
-  // Group waiting patients by doctor/room
-  const waitingByDoctor = waitingPatients.reduce((acc, apt) => {
-    const key = apt.doctorId || 'unknown';
-    if (!acc[key]) {
-      acc[key] = { doctorName: apt.doctorName || 'Doctor', room: apt.room || '1', patients: [] };
-    }
-    acc[key].patients.push(apt);
-    return acc;
-  }, {} as Record<string, { doctorName: string; room: string; patients: typeof waitingPatients }>);
 
   // Get the first in-progress patient for announcements (legacy support)
   const currentPatient = inProgressPatients[0] || null;
@@ -105,13 +93,8 @@ export default function TVDisplayPage() {
     }
   };
 
-  const getTokenDisplay = (appointment: typeof currentPatient) => {
-    if (!appointment) return '';
-    return appointment.tokenNumber ? String(appointment.tokenNumber) : String(todayAppointments.findIndex(a => a.id === appointment.id) + 1);
-  };
-
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('te-IN', {
+    return date.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -120,7 +103,7 @@ export default function TVDisplayPage() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('te-IN', {
+    return date.toLocaleDateString('en-IN', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -128,163 +111,145 @@ export default function TVDisplayPage() {
     });
   };
 
+  // Combine all patients for the queue display: in-progress first, then waiting
+  const allQueuePatients = [...inProgressPatients, ...waitingPatients];
+
+  // Helper to get row background style based on position and status
+  const getRowStyle = (index: number, status: string) => {
+    // 1st patient (Calling / In Consultation) - Orange
+    if (index === 0 && (status === 'in-progress' || status === 'calling')) {
+      return 'bg-orange-500 text-black font-bold';
+    }
+    // 2nd patient (Next to be called / Ready) - Yellow
+    if (index === 1) {
+      return 'bg-yellow-400 text-black font-bold';
+    }
+    // Remaining patients - Black with white text
+    return 'bg-black text-white';
+  };
+
+  // Helper to get status display text
+  const getStatusText = (status: string, index: number) => {
+    if (status === 'in-progress') return 'Calling';
+    if (status === 'calling') return 'Calling';
+    if (index === 1) return 'Next';
+    return 'Waiting';
+  };
+
   return (
-    <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
-      {/* Header - Fixed */}
-      <div className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-700 flex-shrink-0">
+    <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 bg-slate-900 flex-shrink-0">
         {/* Left - Logo */}
         <div className="flex items-center gap-4">
-          <img src={logo} alt="Balaji Heart Center" className="h-16 rounded-lg" />
+          <img src={logo} alt="Balaji Heart Center" className="h-14 rounded-lg" />
         </div>
 
-        {/* Center - Now Serving */}
+        {/* Center - Title */}
         <div className="flex-1 flex flex-col items-center">
-          <div className="flex items-center gap-3">
-            <Stethoscope className="w-8 h-8 text-amber-400" />
-            <h2 className="text-4xl font-bold text-amber-400">ప్రస్తుతం సేవ</h2>
-            <span className="text-xl text-slate-400">(Now Serving)</span>
-            {isAnnouncing && (
-              <Volume2 className="w-6 h-6 text-amber-400 animate-pulse" />
-            )}
-          </div>
+          <h1 className="text-4xl font-bold italic text-green-400 tracking-wide">
+            Outpatient Queue Display
+          </h1>
           {!voiceEnabled && (
             <button
               type="button"
               onClick={handleEnableVoice}
-              className="mt-3 px-6 py-2 rounded-md bg-[#b23438] text-white text-lg font-bold hover:bg-[#9a2c30] transition-colors"
+              className="mt-2 px-4 py-1 rounded-md bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors"
             >
-              Enable Voice / వాయిస్ ఆన్ చేయండి
+              Enable Voice
             </button>
+          )}
+          {voiceEnabled && (
+            <div className="flex items-center gap-2 mt-1">
+              {teluguVoiceAvailable ? (
+                <span className="text-green-400 text-xs">Voice: {teluguVoiceName}</span>
+              ) : (
+                <span className="text-red-400 text-xs">Telugu voice not found!</span>
+              )}
+            </div>
+          )}
+          {isAnnouncing && (
+            <div className="flex items-center gap-2 mt-1">
+              <Volume2 className="w-5 h-5 text-amber-400 animate-pulse" />
+              <span className="text-amber-400 text-sm">Announcing...</span>
+            </div>
           )}
         </div>
 
         {/* Right - Time */}
         <div className="text-right">
-          <div className="text-5xl font-bold text-teal-400 font-mono">
+          <div className="text-3xl font-bold text-teal-400 font-mono">
             {formatTime(currentTime)}
           </div>
-          <div className="text-lg text-slate-300 mt-1">
+          <div className="text-sm text-slate-300">
             {formatDate(currentTime)}
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-400 mt-1 justify-end">
-            <RefreshCw className="w-4 h-4 animate-spin" style={{ animationDuration: '3s' }} />
+          <div className="flex items-center gap-1 text-xs text-slate-400 mt-1 justify-end">
+            <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} />
             Auto-refresh
           </div>
         </div>
       </div>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="flex-1 flex overflow-hidden p-4 gap-4">
-        {/* Left Column - Current Patients (per doctor) and Stats */}
-        <div className="w-1/2 flex flex-col gap-4">
-          {/* Current Patients - One card per doctor with in-progress patient */}
-          {inProgressPatients.length === 0 ? (
-            <Card className="p-6 text-center bg-slate-800/50 border-slate-600">
-              <p className="text-2xl text-slate-400">ప్రస్తుతం ఎవరూ లేరు</p>
-              <p className="text-lg text-slate-500 mt-1">(No patients currently)</p>
-            </Card>
-          ) : (
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-              {inProgressPatients.map((patient) => (
-                <Card
-                  key={patient.id}
-                  className="p-4 bg-gradient-to-r from-teal-800 to-teal-900 border-teal-500/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center text-3xl font-bold flex-shrink-0">
-                      {getTokenDisplay(patient)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-2xl font-bold text-white truncate">
-                        {patient.patient.firstName} {patient.patient.lastName}
-                      </p>
-                      <p className="text-sm text-slate-300 font-mono">
-                        {patient.patient.mrNumber}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <Badge className="text-lg px-3 py-1 bg-[#b23438] text-white border-0">
-                        Room {patient.room || '1'}
-                      </Badge>
-                      <p className="text-sm text-slate-400 mt-1">{patient.doctorName}</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+      {/* Main Content - Full Width Table */}
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="h-full overflow-y-auto">
+          <table className="w-full border-collapse text-xl">
+            {/* Table Header */}
+            <thead className="sticky top-0">
+              <tr className="bg-slate-700 text-slate-100">
+                <th className="py-4 px-6 text-left font-bold text-2xl border-b-2 border-slate-500">Token</th>
+                <th className="py-4 px-6 text-left font-bold text-2xl border-b-2 border-slate-500">Patient</th>
+                <th className="py-4 px-6 text-center font-bold text-2xl border-b-2 border-slate-500">Doctor</th>
+                <th className="py-4 px-6 text-center font-bold text-2xl border-b-2 border-slate-500">Room</th>
+                <th className="py-4 px-6 text-center font-bold text-2xl border-b-2 border-slate-500">Status</th>
+                <th className="py-4 px-6 text-center font-bold text-2xl border-b-2 border-slate-500">ETA</th>
+              </tr>
+            </thead>
+            {/* Table Body */}
+            <tbody>
+              {allQueuePatients.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-2xl text-slate-400">
+                    No patients in queue
+                  </td>
+                </tr>
+              ) : (
+                allQueuePatients.map((apt, index) => {
+                  const opNumber = apt.opNumber || `D${apt.tokenNumber || (todayAppointments.findIndex(a => a.id === apt.id) + 1)}`;
+                  const patientName = `${apt.patient.firstName} ${apt.patient.lastName}`.toLowerCase();
+                  const doctorName = apt.doctorName || 'Doctor';
+                  const roomNumber = apt.room || '1';
+                  const status = getStatusText(apt.status, index);
+                  const eta = apt.waitingTime !== undefined ? `${apt.waitingTime} min` : (index === 0 ? '0 min' : `${index * 5} min`);
 
-          {/* Stats */}
-          <div className="flex gap-4 flex-shrink-0">
-            <Card className="p-4 bg-amber-900/50 border-amber-500/50 flex items-center gap-4 flex-1">
-              <Clock className="w-10 h-10 text-amber-400" />
-              <div>
-                <p className="text-4xl font-bold text-amber-400">{waitingPatients.length}</p>
-                <p className="text-lg text-amber-200">వేచి ఉన్నారు (Waiting)</p>
-              </div>
-            </Card>
-            <Card className="p-4 bg-teal-900/50 border-teal-500/50 flex items-center gap-4 flex-1">
-              <Stethoscope className="w-10 h-10 text-teal-400" />
-              <div>
-                <p className="text-4xl font-bold text-teal-400">{inProgressPatients.length}</p>
-                <p className="text-lg text-teal-200">డాక్టర్ దగ్గర (With Doctor)</p>
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {/* Right Column - Waiting Queue grouped by Doctor/Room */}
-        <div className="w-1/2 flex flex-col overflow-hidden">
-          <div className="flex items-center gap-3 mb-3 flex-shrink-0">
-            <Clock className="w-6 h-6 text-amber-400" />
-            <h3 className="text-2xl font-bold text-amber-400">వేచి ఉన్న క్యూ</h3>
-            <span className="text-lg text-slate-400">(Waiting Queue)</span>
-          </div>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-            {waitingPatients.length === 0 ? (
-              <Card className="p-6 text-center bg-slate-800/50 border-slate-600">
-                <p className="text-xl text-slate-400">వేచి ఉన్న రోగులు లేరు</p>
-                <p className="text-lg text-slate-500">(No waiting patients)</p>
-              </Card>
-            ) : (
-              Object.entries(waitingByDoctor).map(([doctorId, group]) => (
-                <div key={doctorId} className="space-y-2">
-                  <div className="flex items-center gap-2 px-2">
-                    <Badge className="bg-teal-600 text-white border-0">Room {group.room}</Badge>
-                    <span className="text-sm text-slate-300">{group.doctorName}</span>
-                    <span className="text-xs text-slate-500">({group.patients.length} waiting)</span>
-                  </div>
-                  {group.patients.map((apt) => (
-                    <Card key={apt.id} className="p-3 bg-slate-800/50 border-slate-600 hover:border-amber-500/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-amber-500/30 text-amber-400 flex items-center justify-center text-xl font-bold flex-shrink-0">
-                          {apt.tokenNumber || (todayAppointments.findIndex(a => a.id === apt.id) + 1)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-lg font-semibold text-white truncate">
-                            {apt.patient.firstName} {apt.patient.lastName}
-                          </p>
-                          <p className="text-sm text-slate-400 font-mono">{apt.patient.mrNumber}</p>
-                        </div>
-                        <p className="text-sm text-slate-400 flex-shrink-0">{apt.waitingTime || 0} min</p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ))
-            )}
-          </div>
+                  return (
+                    <tr
+                      key={apt.id}
+                      className={`${getRowStyle(index, apt.status)} border-b border-slate-700 transition-colors`}
+                    >
+                      <td className="py-5 px-6 text-2xl font-bold">{opNumber}</td>
+                      <td className="py-5 px-6 text-2xl">{patientName}</td>
+                      <td className="py-5 px-6 text-2xl text-center">{doctorName}</td>
+                      <td className="py-5 px-6 text-2xl text-center">{roomNumber}</td>
+                      <td className="py-5 px-6 text-2xl text-center font-semibold">{status}</td>
+                      <td className="py-5 px-6 text-2xl text-center">{eta}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Footer - Fixed */}
-      <div className="bg-gradient-to-r from-teal-800 to-slate-800 text-white py-4 px-6 flex-shrink-0">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <p className="text-lg font-semibold">
-            దయచేసి మీ పేరు పిలిచే వరకు వేచి ఉండండి 
-            <span className="text-slate-300 ml-2">(Please wait for your name to be called)</span>
+      {/* Footer */}
+      <div className="bg-slate-800 text-white py-3 px-6 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <p className="text-base">
+            Please wait for your name to be called
           </p>
-          <p className="text-lg font-bold">
+          <p className="text-base font-bold">
             Emergency: 108 | Clinic: +91 9100079990 / 9010278278
           </p>
         </div>

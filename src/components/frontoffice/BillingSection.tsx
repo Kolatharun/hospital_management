@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useClinicData, Appointment } from '@/contexts/ClinicDataContext';
+import { useClinicData, Appointment, Patient } from '@/contexts/ClinicDataContext';
 import billingService, { Bill as ApiBill, BillCreate, BillLineItem, BillUpdate } from '@/services/billingService';
 import prescriptionService from '@/services/prescriptionService';
+import { RegistrationToBillingData } from '@/pages/FrontOfficeDashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,8 +100,13 @@ const CONSULTATION_FEES: Record<string, number> = {
   'Gastroenterology': 500,
 };
 
-export function BillingSection() {
-  const { getTodayAppointments } = useClinicData();
+interface BillingSectionProps {
+  pendingPatient?: RegistrationToBillingData | null;
+  onBillingComplete?: () => void;
+}
+
+export function BillingSection({ pendingPatient, onBillingComplete }: BillingSectionProps) {
+  const { getTodayAppointments, addAppointment } = useClinicData();
   const { toast } = useToast();
 
   const [bills, setBills] = useState<Bill[]>([]);
@@ -109,6 +115,9 @@ export function BillingSection() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showReceipt, setShowReceipt] = useState<Bill | null>(null);
+
+  // State for pending patient from registration (new flow)
+  const [pendingRegistrationData, setPendingRegistrationData] = useState<RegistrationToBillingData | null>(null);
 
   // Edit mode state
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
@@ -163,6 +172,54 @@ export function BillingSection() {
   useEffect(() => {
     fetchBills();
   }, [fetchBills]);
+
+  // Effect to auto-open billing form when pendingPatient is provided from registration
+  useEffect(() => {
+    if (pendingPatient && pendingPatient.patient) {
+      // Store the pending registration data for queue addition after billing
+      setPendingRegistrationData(pendingPatient);
+
+      // Create a virtual appointment object for the pending patient
+      // This allows us to use the existing billing flow
+      const virtualAppointment: Appointment = {
+        id: `pending-${pendingPatient.patient.id}-${Date.now()}`,
+        patientId: pendingPatient.patient.id,
+        patient: pendingPatient.patient,
+        doctorId: pendingPatient.doctorId,
+        doctorName: pendingPatient.doctorName,
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        status: 'waiting',
+        waitingTime: 0,
+        room: '1',
+      };
+
+      // Auto-select the patient for billing
+      setSelectedAppointment(virtualAppointment);
+
+      // Set default consultation fee
+      const fee = CONSULTATION_FEES['Cardiology'] || 500;
+      setBillingForm({
+        consultationFee: fee,
+        otherCharges: '',
+        discount: 0,
+        discountPercent: 0,
+        discountGivenBy: '',
+        paymentMethod: 'cash',
+        paymentReference: '',
+        insuranceProvider: '',
+        insurancePolicyNumber: '',
+        paidAmount: fee,
+      });
+      setLabItems([]);
+      setPrescriptionLabTests([]);
+
+      toast({
+        title: 'Patient Ready for Billing',
+        description: `Creating bill for ${pendingPatient.patient.firstName} ${pendingPatient.patient.lastName}. Complete billing to add patient to queue.`,
+      });
+    }
+  }, [pendingPatient]);
 
   const [billingForm, setBillingForm] = useState({
     consultationFee: 0,
@@ -473,6 +530,38 @@ export function BillingSection() {
     setIsCreatingBill(true);
 
     try {
+      // Check if this is a pending registration (no real appointment yet)
+      const isPendingRegistration = pendingRegistrationData !== null &&
+        selectedAppointment.id.startsWith('pending-');
+
+      let actualAppointmentId = selectedAppointment.id;
+
+      // If this is from a pending registration, create the appointment first
+      if (isPendingRegistration && pendingRegistrationData) {
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        const newAppointment = await addAppointment({
+          patientId: pendingRegistrationData.patient.id,
+          patient: pendingRegistrationData.patient,
+          doctorId: pendingRegistrationData.doctorId,
+          doctorName: pendingRegistrationData.doctorName,
+          date: today,
+          time,
+          status: 'waiting',
+          waitingTime: 0,
+          room: '1',
+        });
+
+        actualAppointmentId = newAppointment.id;
+
+        toast({
+          title: 'Patient Added to Queue',
+          description: `${pendingRegistrationData.patient.firstName} ${pendingRegistrationData.patient.lastName} has been added to the queue.`,
+        });
+      }
+
       const lineItems: Omit<BillLineItem, 'id'>[] = labItems.map(item => ({
         item_name: item.name,
         item_type: 'lab',
@@ -483,7 +572,7 @@ export function BillingSection() {
 
       const createData: BillCreate = {
         patient_id: selectedAppointment.patientId,
-        appointment_id: selectedAppointment.id,
+        appointment_id: actualAppointmentId,
         consultation_fee: consultationFeeNum,
         other_charges: billingForm.otherCharges || undefined,
         discount_amount: discountAmount,
@@ -510,6 +599,14 @@ export function BillingSection() {
 
       setSelectedAppointment(null);
       setLabItems([]);
+
+      // Clear pending registration data and notify parent
+      if (isPendingRegistration) {
+        setPendingRegistrationData(null);
+        if (onBillingComplete) {
+          onBillingComplete();
+        }
+      }
 
       toast({
         description: `Bill ${newBill.billNumber} generated successfully.`,
@@ -1128,7 +1225,40 @@ export function BillingSection() {
               </>
             ) : (
               <div className="space-y-4">
-                <div className={`p-4 rounded-lg border ${editingBill ? 'bg-warning/5 border-warning/20' : 'bg-primary/5 border-primary/20'}`}>
+                {/* Pending Registration Banner */}
+                {pendingRegistrationData && selectedAppointment?.id.startsWith('pending-') && (
+                  <div className="p-3 rounded-lg bg-success/10 border border-success/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                        <span className="text-sm font-medium text-success">
+                          New Registration - Complete billing to add patient to queue
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAppointment(null);
+                          setPendingRegistrationData(null);
+                          setLabItems([]);
+                          if (onBillingComplete) {
+                            onBillingComplete();
+                          }
+                          toast({
+                            description: 'Billing cancelled. Patient was not added to queue.',
+                            variant: 'destructive',
+                          });
+                        }}
+                        className="h-6 text-xs text-destructive hover:text-destructive"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className={`p-4 rounded-lg border ${editingBill ? 'bg-warning/5 border-warning/20' : pendingRegistrationData ? 'bg-success/5 border-success/20' : 'bg-primary/5 border-primary/20'}`}>
                   {editingBill ? (
                     <>
                       <div className="flex items-center justify-between">
@@ -1146,11 +1276,18 @@ export function BillingSection() {
                     </>
                   ) : selectedAppointment ? (
                     <>
-                      <p className="font-semibold text-lg">
-                        {selectedAppointment.patient.firstName} {selectedAppointment.patient.lastName}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-lg">
+                          {selectedAppointment.patient.firstName} {selectedAppointment.patient.lastName}
+                        </p>
+                        {pendingRegistrationData && (
+                          <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                            New Patient
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
-                        {selectedAppointment.patient.mrNumber} • {generateOPNumber()}
+                        {selectedAppointment.patient.mrNumber} • {pendingRegistrationData ? 'Dr. ' + pendingRegistrationData.doctorName : generateOPNumber()}
                       </p>
                     </>
                   ) : null}
@@ -1432,9 +1569,17 @@ export function BillingSection() {
                         <Search className="w-4 h-4" />
                         Preview
                       </Button>
-                      <Button onClick={() => handleCreateBill(false)} disabled={isCreatingBill} className="gap-2 flex-1">
+                      <Button
+                        onClick={() => handleCreateBill(false)}
+                        disabled={isCreatingBill}
+                        className={`gap-2 flex-1 ${pendingRegistrationData ? 'bg-success hover:bg-success/90' : ''}`}
+                      >
                         <Save className="w-4 h-4" />
-                        {isCreatingBill ? 'Creating...' : 'Save Bill'}
+                        {isCreatingBill
+                          ? 'Creating...'
+                          : pendingRegistrationData
+                            ? 'Save Bill & Add to Queue'
+                            : 'Save Bill'}
                       </Button>
                     </>
                   )}
