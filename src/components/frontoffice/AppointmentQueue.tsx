@@ -31,15 +31,41 @@ export function AppointmentQueue() {
   const inProgressAppointments = todayAppointments.filter(a => a.status === 'in-progress');
   const completedAppointments = todayAppointments.filter(a => a.status === 'completed');
 
-  // Derive "Now Serving" from DB state — the first in-progress appointment
-  const currentPatient = inProgressAppointments[0] || null;
-  const hasPatientInProgress = inProgressAppointments.length > 0;
+  // Group appointments by doctor
+  const appointmentsByDoctor = todayAppointments.reduce((acc, apt) => {
+    const doctorKey = apt.doctorId;
+    if (!acc[doctorKey]) {
+      acc[doctorKey] = {
+        doctorId: apt.doctorId,
+        doctorName: apt.doctorName || 'Unknown Doctor',
+        room: apt.room || '-',
+        appointments: [],
+      };
+    }
+    acc[doctorKey].appointments.push(apt);
+    return acc;
+  }, {} as Record<string, { doctorId: string; doctorName: string; room: string; appointments: Appointment[] }>);
+
+  const doctorGroups = Object.values(appointmentsByDoctor);
+
+  // Group in-progress appointments by doctor (one per doctor)
+  const inProgressByDoctor = inProgressAppointments.reduce((acc, apt) => {
+    if (!acc[apt.doctorId]) {
+      acc[apt.doctorId] = apt;
+    }
+    return acc;
+  }, {} as Record<string, Appointment>);
+
+  // Check if a specific doctor has a patient in progress
+  const doctorHasPatientInProgress = (doctorId: string) => {
+    return !!inProgressByDoctor[doctorId];
+  };
 
   const handleCall = async (appointment: Appointment) => {
-    if (hasPatientInProgress) {
+    if (doctorHasPatientInProgress(appointment.doctorId)) {
       toast({
         title: 'Cannot Call',
-        description: 'Doctor must complete the current consultation before calling next patient.',
+        description: `${appointment.doctorName || 'Doctor'} must complete the current consultation before calling next patient.`,
         variant: 'destructive',
       });
       return;
@@ -141,29 +167,38 @@ export function AppointmentQueue() {
 
   return (
     <div className="medical-section space-y-6">
-      {/* Now Serving Banner - Driven by DB state (in-progress appointment) */}
-      {currentPatient && (
-        <div className="now-serving-banner flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div>
-              <p className="text-sm opacity-80">Now Serving</p>
-              <p className="text-3xl font-bold">
-                {currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`}
-              </p>
+      {/* Now Serving Banners - One per doctor with in-progress patient */}
+      {inProgressAppointments.length > 0 && (
+        <div className="space-y-3">
+          {inProgressAppointments.map((currentPatient) => (
+            <div key={currentPatient.id} className="now-serving-banner flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div>
+                  <p className="text-sm opacity-80">Now Serving</p>
+                  <p className="text-3xl font-bold">
+                    {currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`}
+                  </p>
+                </div>
+                <div className="h-12 w-px bg-white/30" />
+                <div>
+                  <p className="text-sm opacity-80">Patient Name</p>
+                  <p className="text-2xl font-bold">
+                    {currentPatient.patient.firstName} {currentPatient.patient.lastName}
+                  </p>
+                </div>
+                <div className="h-12 w-px bg-white/30" />
+                <div>
+                  <p className="text-sm opacity-80">Room</p>
+                  <p className="text-2xl font-bold">{currentPatient.room || '-'}</p>
+                </div>
+                <div className="h-12 w-px bg-white/30" />
+                <div>
+                  <p className="text-sm opacity-80">Doctor</p>
+                  <p className="text-2xl font-bold">{currentPatient.doctorName || '-'}</p>
+                </div>
+              </div>
             </div>
-            <div className="h-12 w-px bg-white/30" />
-            <div>
-              <p className="text-sm opacity-80">Patient Name</p>
-              <p className="text-2xl font-bold">
-                {currentPatient.patient.firstName} {currentPatient.patient.lastName}
-              </p>
-            </div>
-            <div className="h-12 w-px bg-white/30" />
-            <div>
-              <p className="text-sm opacity-80">Room Number</p>
-              <p className="text-2xl font-bold">{currentPatient.room || '-'}</p>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
@@ -258,97 +293,103 @@ export function AppointmentQueue() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Main Queue Tab */}
-        <TabsContent value="main" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Stethoscope className="w-4 h-4" />
-                Main Queue
-                <Badge className="ml-2">{todayAppointments.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-primary/10">
-                      <TableHead className="font-bold text-primary">OP Number</TableHead>
-                      <TableHead className="font-bold text-primary">MR Number</TableHead>
-                      <TableHead className="font-bold text-primary">Patient Name</TableHead>
-                      <TableHead className="font-bold text-primary">Room</TableHead>
-                      <TableHead className="font-bold text-primary">Waiting Time</TableHead>
-                      <TableHead className="font-bold text-primary">Status</TableHead>
-                      <TableHead className="font-bold text-primary">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {todayAppointments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No patients in queue
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      todayAppointments.map((appointment) => (
-                        <TableRow key={appointment.id} className="hover:bg-muted/50 transition-colors">
-                          <TableCell className="font-mono text-sm font-semibold text-accent">
-                            {appointment.opNumber || `OP-${appointment.tokenNumber}`}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {appointment.patient.mrNumber}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {appointment.patient.firstName} {appointment.patient.lastName}
-                          </TableCell>
-                          <TableCell>{appointment.room || '-'}</TableCell>
-                          <TableCell>
-                            {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {appointment.waitingTime || 0} min
-                              </span>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(appointment.status)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {appointment.status === 'waiting' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    className="gap-1 bg-destructive hover:bg-destructive/90 font-bold hover:scale-105 transition-transform"
-                                    onClick={() => handleCall(appointment)}
-                                    disabled={hasPatientInProgress || callingId === appointment.id}
-                                    title={hasPatientInProgress ? 'Doctor must complete the current consultation first' : 'Call patient'}
-                                  >
-                                    <Phone className="w-3 h-3" />
-                                    {callingId === appointment.id ? 'Calling...' : 'Call'}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleBuffer(appointment.id)}
-                                    className="gap-1 font-bold hover:bg-primary hover:text-primary-foreground"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    Buffer (+5m)
-                                  </Button>
-                                </>
-                              )}
-                              {appointment.status === 'in-progress' && (
-                                <span className="text-sm text-primary font-medium">With Doctor</span>
-                              )}
-                            </div>
-                          </TableCell>
+        {/* Main Queue Tab - Grouped by Doctor */}
+        <TabsContent value="main" className="mt-4 space-y-6">
+          {doctorGroups.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <p className="text-center text-muted-foreground">No patients in queue</p>
+              </CardContent>
+            </Card>
+          ) : (
+            doctorGroups.map((group) => (
+              <Card key={group.doctorId}>
+                <CardHeader className="bg-primary/5 border-b">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Stethoscope className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-bold text-primary">{group.doctorName}</span>
+                      <span className="mx-3 text-muted-foreground">–</span>
+                      <span className="text-base font-medium">Room {group.room}</span>
+                    </div>
+                    <Badge className="ml-auto">{group.appointments.length} Patients</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-primary/10">
+                          <TableHead className="font-bold text-primary">OP Number</TableHead>
+                          <TableHead className="font-bold text-primary">MR Number</TableHead>
+                          <TableHead className="font-bold text-primary">Patient Name</TableHead>
+                          <TableHead className="font-bold text-primary">Waiting Time</TableHead>
+                          <TableHead className="font-bold text-primary">Status</TableHead>
+                          <TableHead className="font-bold text-primary">Action</TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {group.appointments.map((appointment) => (
+                          <TableRow key={appointment.id} className="hover:bg-muted/50 transition-colors">
+                            <TableCell className="font-mono text-sm font-semibold text-accent">
+                              {appointment.opNumber || `OP-${appointment.tokenNumber}`}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {appointment.patient.mrNumber}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {appointment.patient.firstName} {appointment.patient.lastName}
+                            </TableCell>
+                            <TableCell>
+                              {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {appointment.waitingTime || 0} min
+                                </span>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(appointment.status)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {appointment.status === 'waiting' && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="gap-1 bg-destructive hover:bg-destructive/90 font-bold hover:scale-105 transition-transform"
+                                      onClick={() => handleCall(appointment)}
+                                      disabled={doctorHasPatientInProgress(appointment.doctorId) || callingId === appointment.id}
+                                      title={doctorHasPatientInProgress(appointment.doctorId) ? `${appointment.doctorName || 'Doctor'} must complete the current consultation first` : 'Call patient'}
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                      {callingId === appointment.id ? 'Calling...' : 'Call'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleBuffer(appointment.id)}
+                                      className="gap-1 font-bold hover:bg-primary hover:text-primary-foreground"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      Buffer (+5m)
+                                    </Button>
+                                  </>
+                                )}
+                                {appointment.status === 'in-progress' && (
+                                  <span className="text-sm text-primary font-medium">With Doctor</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
 
         {/* Lab Queue Tab */}

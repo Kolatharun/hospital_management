@@ -1,9 +1,9 @@
 """
 Prescription Generator - Generates prescription HTML and PDF.
 
-Mirrors the frontend print template from PrescriptionForm.tsx.
-Uses table-based layout for xhtml2pdf compatibility (no flexbox support).
-Uses header/footer images matching the clinic stationery.
+Mirrors the frontend print template from PrescriptionForm.tsx EXACTLY.
+Uses table-based layout for xhtml2pdf compatibility (no flexbox/grid support).
+Matches: header, patient info box, vitals sidebar, prescription content, footer.
 """
 
 import base64
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
 HEADER_PATH = ASSETS_DIR / "prescription-header.jpeg"
 FOOTER_PATH = ASSETS_DIR / "prescription-footer.jpeg"
+LOGO_PATH = ASSETS_DIR / "logo.jpeg"
 PRESCRIPTIONS_DIR = Path(__file__).parent.parent.parent / "uploads" / "prescriptions"
 
 
@@ -75,8 +76,8 @@ def generate_prescription_html(
 ) -> str:
     """Generate prescription HTML for PDF rendering via xhtml2pdf.
 
-    Uses flat table layout (no thead/tfoot - xhtml2pdf has limited support).
-    Matches the frontend PrescriptionForm.tsx print layout.
+    Uses table-based layout matching the frontend PrescriptionForm.tsx print layout EXACTLY.
+    All flexbox/grid replaced with tables for xhtml2pdf compatibility.
 
     Args:
         prescription: The prescription model
@@ -87,6 +88,14 @@ def generate_prescription_html(
     """
     patient = prescription.patient
     appointment = prescription.appointment
+    doctor = prescription.doctor
+
+    # Doctor details from prescription's doctor relationship
+    doctor_name = doctor.name if doctor else "Doctor"
+    doctor_qualification = doctor.qualification if doctor else ""
+    doctor_registration = doctor.registration_number if doctor else ""
+    doctor_speciality = doctor.speciality if doctor else ""
+    doctor_phone = doctor.phone if doctor else ""
 
     # Patient details - safely handle None
     patient_name = f"{patient.first_name} {patient.last_name}" if patient else "-"
@@ -114,9 +123,9 @@ def generate_prescription_html(
             treatment_lines.append(line)
     treatment_text = "<br/>".join(treatment_lines) if treatment_lines else "-"
 
-    # Vitals display - safely handle None
-    spo2 = f"{vitals.spo2} %" if vitals and vitals.spo2 else "%"
-    pulse = f"{vitals.pulse} mm/mt" if vitals and vitals.pulse else "mm/mt"
+    # Vitals display - safely handle None (match frontend format)
+    spo2 = f"{vitals.spo2}%" if vitals and vitals.spo2 else ""
+    pulse = f"{vitals.pulse} mm/mt" if vitals and vitals.pulse else ""
     cvs = _esc(vitals.cvs) if vitals and vitals.cvs else ""
     rs = _esc(vitals.rs) if vitals and vitals.rs else ""
     jvp = _esc(vitals.jvp) if vitals and vitals.jvp else ""
@@ -130,13 +139,8 @@ def generate_prescription_html(
     ptca_cabg = _esc(vitals.ptca_cabg) if vitals and vitals.ptca_cabg else ""
     current_drugs = _esc(vitals.current_drugs) if vitals and vitals.current_drugs else ""
 
-    # Header/footer images as base64
-    header_src = _get_image_base64(HEADER_PATH)
-    footer_src = _get_image_base64(FOOTER_PATH)
-
-    # Build header/footer HTML - use simple img tags, no thead/tfoot
-    header_html = f'<img src="{header_src}" width="100%" />' if header_src else ""
-    footer_html = f'<img src="{footer_src}" width="100%" />' if footer_src else ""
+    # Logo image as base64
+    logo_src = _get_image_base64(LOGO_PATH)
 
     # Vitals section heading based on fallback status
     vitals_heading_color = "#b45309" if is_old_vitals else "#8B0000"
@@ -154,208 +158,333 @@ def generate_prescription_html(
         vitals_source_html = f'<br/><span style="font-size: 9px; color: #92400e;">From: {_esc(source_op_number)}{visit_date_str}</span>'
 
     html = f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
+<meta charset="UTF-8"/>
 <title>Prescription - {_esc(patient_name)}</title>
 <style>
-    @page {{
-        size: A4;
-        margin: 0;
-    }}
-    body {{
-        font-family: Helvetica, Arial, sans-serif;
-        font-size: 13px;
-        color: #222;
-        margin: 0;
-        padding: 0;
-    }}
-    p {{
-        margin: 0;
-    }}
+@page {{
+    size: A4;
+    margin: 10mm 12mm 10mm 12mm;
+}}
+* {{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}}
+body {{
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    color: #222;
+    background: #fff;
+    line-height: 1.3;
+}}
+table {{
+    border-collapse: collapse;
+    border-spacing: 0;
+}}
 
-    .content-area {{
-        padding: 20px 30px 10px 30px;
-    }}
+/* Header */
+.header-section {{
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}}
+.tagline {{
+    text-align: center;
+    color: #8B0000;
+    font-size: 10px;
+    font-style: italic;
+    margin-bottom: 8px;
+}}
+.header-table {{
+    width: 510px;
+    table-layout: fixed;
+}}
+.header-table td {{
+    vertical-align: top;
+    border: none;
+}}
+.dr-info-cell {{
+    width: 360px;
+}}
+.logo-cell {{
+    width: 150px;
+    text-align: right;
+}}
+.dr-name {{
+    color: #8B0000;
+    font-size: 16px;
+    font-weight: bold;
+    white-space: nowrap;
+}}
+.dr-degree {{
+    color: #444;
+    font-size: 9px;
+    white-space: nowrap;
+}}
+.dr-title {{
+    color: #8B0000;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 2px;
+    white-space: nowrap;
+}}
+.dr-hospital {{
+    color: #0066cc;
+    font-size: 9px;
+    white-space: nowrap;
+}}
+.dr-contact {{
+    color: #0066cc;
+    font-size: 8px;
+    white-space: nowrap;
+}}
+.logo-img {{
+    width: 130px;
+    height: 70px;
+}}
+.header-line {{
+    border-top: 2px solid #8B0000;
+    margin-top: 6px;
+}}
 
-    /* Patient Info Table */
-    .patient-info-table {{
-        width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #bbb;
-        margin-bottom: 20px;
-    }}
-    .patient-info-table td {{
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        vertical-align: top;
-    }}
-    .pi-label {{
-        color: #8B0000;
-        font-size: 11px;
-        font-weight: bold;
-    }}
-    .pi-value {{
-        font-size: 14px;
-        font-weight: bold;
-    }}
+/* Patient Info Box */
+.patient-box {{
+    border: 1px solid #ccc;
+    margin-bottom: 12px;
+    width: 510px;
+}}
+.patient-table {{
+    width: 510px;
+    table-layout: fixed;
+}}
+.patient-table td {{
+    padding: 6px 8px;
+    vertical-align: top;
+    border: none;
+    overflow: hidden;
+}}
+.p-label {{
+    color: #8B0000;
+    font-size: 9px;
+    font-weight: bold;
+    white-space: nowrap;
+}}
+.p-value {{
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    white-space: nowrap;
+}}
 
-    /* Two Column Layout */
-    .two-col-table {{
-        width: 100%;
-        border-collapse: collapse;
-    }}
-    .two-col-table td {{
-        vertical-align: top;
-        padding: 0;
-    }}
-    .col-vitals {{
-        width: 220px;
-        padding-right: 15px;
-    }}
-    .col-prescription {{
-        padding-left: 15px;
-        border-left: 1px solid #ddd;
-    }}
+/* Main Layout */
+.main-table {{
+    width: 510px;
+    table-layout: fixed;
+}}
+.main-table td {{
+    vertical-align: top;
+    border: none;
+}}
+.vitals-col {{
+    width: 130px;
+    padding-right: 10px;
+}}
+.rx-col {{
+    width: 380px;
+    padding-left: 10px;
+    border-left: 1px solid #ddd;
+}}
 
-    /* Vitals List */
-    .vitals-list {{
-        width: 100%;
-        border-collapse: collapse;
-    }}
-    .vitals-list td {{
-        padding: 3px 0;
-        vertical-align: top;
-        font-size: 13px;
-    }}
-    .vl-label {{
-        font-weight: bold;
-        color: #333;
-        padding-right: 8px;
-        width: 110px;
-    }}
-    .vl-value {{
-        color: #444;
-    }}
+/* Vitals */
+.vitals-title {{
+    font-size: 10px;
+    font-weight: bold;
+    color: #8B0000;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}}
+.vitals-table {{
+    width: 120px;
+    table-layout: fixed;
+}}
+.vitals-table td {{
+    padding: 2px 0;
+    font-size: 10px;
+    border: none;
+    vertical-align: top;
+}}
+.vitals-table .vl {{
+    font-weight: bold;
+    color: #000;
+    width: 75px;
+    white-space: nowrap;
+}}
+.vitals-table .vv {{
+    color: #333;
+    width: 45px;
+}}
 
-    /* Prescription Sections */
-    .rx-title {{
-        font-size: 13px;
-        font-weight: bold;
-        color: #333;
-        padding-top: 10px;
-        padding-bottom: 3px;
-    }}
-    .rx-content {{
-        font-size: 13px;
-        color: #444;
-        line-height: 1.5;
-        padding-bottom: 6px;
-    }}
+/* Prescription */
+.rx-section {{
+    margin-bottom: 10px;
+}}
+.rx-title {{
+    font-weight: bold;
+    font-size: 11px;
+    color: #000;
+    margin-bottom: 2px;
+}}
+.rx-value {{
+    font-size: 11px;
+    color: #333;
+    line-height: 1.4;
+}}
+
+/* Footer */
+.footer-section {{
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    text-align: center;
+    width: 510px;
+}}
+.services {{
+    color: #0066cc;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+}}
+.timings {{
+    font-size: 10px;
+    color: #333;
+    margin-bottom: 5px;
+}}
+.timings b {{
+    color: #8B0000;
+}}
+.medicover {{
+    font-size: 10px;
+    margin-bottom: 5px;
+}}
+.medicover .heart {{
+    color: #8B0000;
+}}
+.medicover .name {{
+    color: #8B0000;
+    font-weight: bold;
+}}
+.medicover .hosp {{
+    color: #666;
+}}
+.address {{
+    font-size: 9px;
+    color: #666;
+    margin-bottom: 5px;
+}}
+.contact {{
+    font-size: 10px;
+    font-weight: bold;
+    color: #000;
+}}
 </style>
 </head>
 <body>
 
-<!-- HEADER IMAGE -->
-{header_html}
-
-<!-- CONTENT -->
-<div class="content-area">
-
-    <!-- Patient Info -->
-    <table class="patient-info-table">
+<!-- HEADER -->
+<div class="header-section">
+    <div class="tagline">30 Years Experience in Treating BP and Heart Diseases</div>
+    <table class="header-table">
         <tr>
-            <td>
-                <span class="pi-label">MR. No:</span><br/>
-                <span class="pi-value">{_esc(mr_number)}</span>
+            <td class="dr-info-cell">
+                <div class="dr-name">{_esc(doctor_name)}</div>
+                <div class="dr-degree">{_esc(doctor_qualification)}</div>
+                <div class="dr-degree">Regd No: {_esc(doctor_registration)}</div>
+                <div class="dr-title">{_esc(doctor_speciality)}</div>
+                <div class="dr-hospital">Medicover Hospitals - Hitech City</div>
+                <div class="dr-contact">Tel: {_esc(doctor_phone)}</div>
+                <div class="dr-contact">www.balajiheartcenter.com</div>
+                <div class="dr-contact">www.facebook.com/balajiheartcenter</div>
             </td>
-            <td>
-                <span class="pi-label">DATE:</span><br/>
-                <span class="pi-value">{rx_date}</span>
-            </td>
-            <td>
-                <span class="pi-label">Patient Name:</span><br/>
-                <span class="pi-value">{_esc(patient_name)}</span>
-            </td>
-            <td>
-                <span class="pi-label">Gender/Age:</span><br/>
-                <span class="pi-value">{_esc(gender)} / {age}</span>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <span class="pi-label">OP No:</span><br/>
-                <span class="pi-value">{_esc(op_number)}</span>
-            </td>
-            <td>
-                <span class="pi-label">Weight:</span><br/>
-                <span class="pi-value">{weight}</span>
-            </td>
-            <td>
-                <span class="pi-label">Mobile No:</span><br/>
-                <span class="pi-value">{_esc(phone)}</span>
-            </td>
-            <td></td>
-        </tr>
-    </table>
-
-    <!-- Two Column: Vitals Left | Prescription Right -->
-    <table class="two-col-table">
-        <tr>
-            <!-- LEFT: Vitals -->
-            <td class="col-vitals">
-                <div style="margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">
-                    <span style="font-size: 11px; font-weight: bold; color: {vitals_heading_color};">
-                        {vitals_heading_text}
-                    </span>
-                    {vitals_source_html}
-                </div>
-                <table class="vitals-list">
-                    <tr><td class="vl-label">SPO2:</td><td class="vl-value">{spo2}</td></tr>
-                    <tr><td class="vl-label">PR:</td><td class="vl-value">{pulse}</td></tr>
-                    <tr><td class="vl-label">CVS:</td><td class="vl-value">{cvs}</td></tr>
-                    <tr><td class="vl-label">RS:</td><td class="vl-value">{rs}</td></tr>
-                    <tr><td class="vl-label">JVP:</td><td class="vl-value">{jvp}</td></tr>
-                    <tr><td class="vl-label">BP:</td><td class="vl-value">{bp}</td></tr>
-                    <tr><td class="vl-label">HTN:</td><td class="vl-value">{htn}</td></tr>
-                    <tr><td class="vl-label">DM:</td><td class="vl-value">{dm}</td></tr>
-                    <tr><td class="vl-label">SMOKING:</td><td class="vl-value">{smoking}</td></tr>
-                    <tr><td class="vl-label">THYROID:</td><td class="vl-value"></td></tr>
-                    <tr><td class="vl-label">HLP:</td><td class="vl-value">{hlp}</td></tr>
-                    <tr><td class="vl-label">F H/O CAD:</td><td class="vl-value">{family_ho_cad}</td></tr>
-                    <tr><td class="vl-label">HEART DISEASE:</td><td class="vl-value">{heart_disease}</td></tr>
-                    <tr><td class="vl-label">PTCA/CABG:</td><td class="vl-value">{ptca_cabg}</td></tr>
-                    <tr><td class="vl-label">DRUGS:</td><td class="vl-value">{current_drugs}</td></tr>
-                </table>
-            </td>
-
-            <!-- RIGHT: Prescription -->
-            <td class="col-prescription">
-                <p class="rx-title">Complaint:</p>
-                <p class="rx-content">{_nl2br(prescription.complaint) if prescription.complaint else '-'}</p>
-
-                <p class="rx-title">History:</p>
-                <p class="rx-content">{_nl2br(prescription.history) if prescription.history and prescription.history != 'NULL' else '-'}</p>
-
-                <p class="rx-title">Treatment:</p>
-                <p class="rx-content">{treatment_text}</p>
-
-                <p class="rx-title">Diagnosis:</p>
-                <p class="rx-content">{_nl2br(prescription.diagnosis) if prescription.diagnosis else '-'}</p>
-
-                <p class="rx-title">Advice:</p>
-                <p class="rx-content">{_nl2br(prescription.advice) if prescription.advice else '-'}</p>
-
-                <p class="rx-title">Lab/Investigation:</p>
-                <p class="rx-content">{_nl2br(prescription.lab_tests) if prescription.lab_tests else '-'}</p>
+            <td class="logo-cell">
+                {"<img src='" + logo_src + "' class='logo-img'/>" if logo_src else ""}
             </td>
         </tr>
     </table>
-
+    <div class="header-line"></div>
 </div>
 
-<!-- FOOTER IMAGE -->
-{footer_html}
+<!-- PATIENT INFO -->
+<div class="patient-box">
+    <table class="patient-table">
+        <col width="115"/>
+        <col width="100"/>
+        <col width="175"/>
+        <col width="120"/>
+        <tr>
+            <td><span class="p-label">MR. No:</span><br/><span class="p-value">{_esc(mr_number)}</span></td>
+            <td><span class="p-label">DATE:</span><br/><span class="p-value">{rx_date}</span></td>
+            <td><span class="p-label">Patient Name:</span><br/><span class="p-value">{_esc(patient_name)}</span></td>
+            <td><span class="p-label">Gender/Age:</span><br/><span class="p-value">{_esc(gender)} / {age}</span></td>
+        </tr>
+        <tr>
+            <td style="border-top:1px solid #eee;"><span class="p-label">OP No:</span><br/><span class="p-value">{_esc(op_number)}</span></td>
+            <td style="border-top:1px solid #eee;"><span class="p-label">Weight:</span><br/><span class="p-value">{weight}</span></td>
+            <td style="border-top:1px solid #eee;"><span class="p-label">Mobile No:</span><br/><span class="p-value">{_esc(phone)}</span></td>
+            <td style="border-top:1px solid #eee;"></td>
+        </tr>
+    </table>
+</div>
+
+<!-- MAIN: Vitals + Prescription -->
+<table class="main-table">
+    <col width="130"/>
+    <col width="380"/>
+    <tr>
+        <td class="vitals-col">
+            <div class="vitals-title" style="color:{vitals_heading_color};">{vitals_heading_text}{vitals_source_html}</div>
+            <table class="vitals-table">
+                <col width="75"/>
+                <col width="45"/>
+                <tr><td class="vl">SPO2:</td><td class="vv">{spo2}</td></tr>
+                <tr><td class="vl">PR:</td><td class="vv">{pulse}</td></tr>
+                <tr><td class="vl">CVS:</td><td class="vv">{cvs}</td></tr>
+                <tr><td class="vl">RS:</td><td class="vv">{rs}</td></tr>
+                <tr><td class="vl">JVP:</td><td class="vv">{jvp}</td></tr>
+                <tr><td class="vl">BP:</td><td class="vv">{bp}</td></tr>
+                <tr><td class="vl">HTN:</td><td class="vv">{htn}</td></tr>
+                <tr><td class="vl">DM:</td><td class="vv">{dm}</td></tr>
+                <tr><td class="vl">SMOKING:</td><td class="vv">{smoking}</td></tr>
+                <tr><td class="vl">THYROID:</td><td class="vv"></td></tr>
+                <tr><td class="vl">HLP:</td><td class="vv">{hlp}</td></tr>
+                <tr><td class="vl">F H/O CAD:</td><td class="vv">{family_ho_cad}</td></tr>
+                <tr><td class="vl">HEART DISEASE:</td><td class="vv">{heart_disease}</td></tr>
+                <tr><td class="vl">PTCA/CABG:</td><td class="vv">{ptca_cabg}</td></tr>
+                <tr><td class="vl">DRUGS:</td><td class="vv">{current_drugs}</td></tr>
+            </table>
+        </td>
+        <td class="rx-col">
+            <div class="rx-section"><div class="rx-title">Complaint:</div><div class="rx-value">{_nl2br(prescription.complaint) if prescription.complaint else '-'}</div></div>
+            <div class="rx-section"><div class="rx-title">History:</div><div class="rx-value">{_nl2br(prescription.history) if prescription.history and prescription.history != 'NULL' else '-'}</div></div>
+            <div class="rx-section"><div class="rx-title">Treatment:</div><div class="rx-value">{treatment_text}</div></div>
+            <div class="rx-section"><div class="rx-title">Diagnosis:</div><div class="rx-value">{_nl2br(prescription.diagnosis) if prescription.diagnosis else '-'}</div></div>
+            <div class="rx-section"><div class="rx-title">Advice:</div><div class="rx-value">{_nl2br(prescription.advice) if prescription.advice else '-'}</div></div>
+            <div class="rx-section"><div class="rx-title">Lab/Investigation:</div><div class="rx-value">{_nl2br(prescription.lab_tests) if prescription.lab_tests else '-'}</div></div>
+        </td>
+    </tr>
+</table>
+
+<!-- FOOTER -->
+<div class="footer-section">
+    <div class="services">ECG &nbsp; ECHO &nbsp; TMT &nbsp; HOLTER &nbsp; ABPM</div>
+    <div class="timings"><b>Chanda Nagar :</b> Morning : 8.30 am to 10.30 am, <b>Evening</b> 6.30 pm to 9.30 pm</div>
+    <div class="medicover"><span class="heart">&#9829;</span> <span class="name">MEDICOVER</span> <span class="hosp">HOSPITALS Hitech City</span></div>
+    <div class="address">SVL Towers, Ground Floor, Opp. Anu Furniture, Beside Narayana Junior Collage, Chanda Nagar<br/>Hyderabad - 500 050, Telangana Email: balajiheartcenter.hyd@gmail.com</div>
+    <div class="contact">For Appointment: +91 9100079990 / 9010278278 / 040-2303 2345</div>
+</div>
 
 </body>
 </html>"""

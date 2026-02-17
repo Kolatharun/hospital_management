@@ -58,19 +58,15 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
   },
   pulse: {
     required: true,
-    min: 30,
-    max: 250,
     pattern: /^\d+$/,
     messages: {
       required: 'Pulse rate is required',
-      min: 'Pulse must be at least 30 BPM',
-      max: 'Pulse cannot exceed 250 BPM',
       pattern: 'Pulse must be a valid number',
     },
   },
   bloodPressure: {
     required: true,
-    pattern: /^\d{2,3}\/\d{2,3}$/,
+    pattern: /^\d{1,3}\/\d{1,3}$/,
     custom: (value: string) => {
       if (!value) return null;
       if (!value.includes('/')) {
@@ -84,15 +80,6 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
       const diastolic = parseInt(parts[1]);
       if (isNaN(systolic) || isNaN(diastolic)) {
         return 'Blood pressure values must be valid numbers';
-      }
-      if (systolic < 50 || systolic > 300) {
-        return 'Systolic pressure must be between 50 and 300 mmHg';
-      }
-      if (diastolic < 30 || diastolic > 200) {
-        return 'Diastolic pressure must be between 30 and 200 mmHg';
-      }
-      if (diastolic >= systolic) {
-        return 'Systolic pressure must be greater than diastolic pressure';
       }
       return null;
     },
@@ -428,9 +415,9 @@ export function VitalsCollection() {
       spo2: '',
       pulse: '',
       bloodPressure: '',
-      cvs: 'S1 S2 Normal',
-      rs: 'Clear',
-      jvp: 'Normal',
+      cvs: '',
+      rs: '',
+      jvp: '',
       weight: '',
       hlp: '',
       htn: '',
@@ -982,6 +969,10 @@ export function VitalsCollection() {
                       <TableHead className="font-bold text-primary">CVS/RS</TableHead>
                       <TableHead className="font-bold text-primary">HTN/DM</TableHead>
                       <TableHead className="font-bold text-primary">Smoking</TableHead>
+                      <TableHead className="font-bold text-primary">Family H/O CAD</TableHead>
+                      <TableHead className="font-bold text-primary">Heart Disease</TableHead>
+                      <TableHead className="font-bold text-primary">PTCA/CABG</TableHead>
+                      <TableHead className="font-bold text-primary">Current Drugs</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1025,6 +1016,26 @@ export function VitalsCollection() {
                           <TableCell>
                             <div className="text-sm">
                               {record.smoking || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {record.family_ho_cad || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {record.heart_disease || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {record.ptca_cabg || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm max-w-[150px] truncate" title={record.current_drugs || ''}>
+                              {record.current_drugs || '-'}
                             </div>
                           </TableCell>
                         </TableRow>

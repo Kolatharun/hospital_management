@@ -220,11 +220,12 @@ class AppointmentRepository(BaseRepository[Appointment]):
     def recalculate_waiting_times(self) -> None:
         """Recalculate waiting_time_minutes for all today's appointments based on queue position.
 
+        Waiting times are calculated PER DOCTOR - each doctor has their own queue.
         Each patient's effective slot = CONSULTATION_TIME_MINUTES + BUFFER_TIME_MINUTES + their buffer_time_minutes.
-        A patient's waiting time = sum of effective slots of all patients ahead of them in queue.
+        A patient's waiting time = sum of effective slots of all patients ahead of them in their doctor's queue.
 
         - In-progress patient: 0 min (already with doctor)
-        - Waiting patients: cumulative sum of preceding slots
+        - Waiting patients: cumulative sum of preceding slots for same doctor
         - Completed/cancelled: 0 min
         """
         today = date.today()
@@ -235,25 +236,35 @@ class AppointmentRepository(BaseRepository[Appointment]):
             Appointment.is_deleted == False,
         ).order_by(Appointment.token_number).all()
 
-        # Build ordered list of active patients (in-progress first, then waiting)
-        active_queue = [a for a in appointments if a.status == AppointmentStatus.IN_PROGRESS]
-        active_queue += [a for a in appointments if a.status == AppointmentStatus.WAITING]
-
-        # Calculate cumulative waiting time
-        cumulative = 0
-        for apt in active_queue:
-            effective_slot = base_slot + (apt.buffer_time_minutes or 0)
-            if apt.status == AppointmentStatus.IN_PROGRESS:
-                apt.waiting_time_minutes = 0
-                cumulative += effective_slot
-            elif apt.status == AppointmentStatus.WAITING:
-                apt.waiting_time_minutes = cumulative
-                cumulative += effective_slot
-
-        # Zero out completed/cancelled
+        # Group appointments by doctor_id
+        doctor_queues: Dict[UUID, list] = {}
         for apt in appointments:
-            if apt.status in (AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED):
-                apt.waiting_time_minutes = 0
+            doctor_id = apt.doctor_id
+            if doctor_id not in doctor_queues:
+                doctor_queues[doctor_id] = []
+            doctor_queues[doctor_id].append(apt)
+
+        # Calculate waiting times per doctor
+        for doctor_id, doctor_appointments in doctor_queues.items():
+            # Build ordered list of active patients (in-progress first, then waiting)
+            active_queue = [a for a in doctor_appointments if a.status == AppointmentStatus.IN_PROGRESS]
+            active_queue += [a for a in doctor_appointments if a.status == AppointmentStatus.WAITING]
+
+            # Calculate cumulative waiting time for this doctor's queue
+            cumulative = 0
+            for apt in active_queue:
+                effective_slot = base_slot + (apt.buffer_time_minutes or 0)
+                if apt.status == AppointmentStatus.IN_PROGRESS:
+                    apt.waiting_time_minutes = 0
+                    cumulative += effective_slot
+                elif apt.status == AppointmentStatus.WAITING:
+                    apt.waiting_time_minutes = cumulative
+                    cumulative += effective_slot
+
+            # Zero out completed/cancelled for this doctor
+            for apt in doctor_appointments:
+                if apt.status in (AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED):
+                    apt.waiting_time_minutes = 0
 
         self.db.commit()
 

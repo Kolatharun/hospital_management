@@ -36,7 +36,17 @@ export default function TVDisplayPage() {
   const waitingPatients = todayAppointments.filter(a => a.status === 'waiting');
   const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress');
 
-  // Get only the first patient with doctor (one record)
+  // Group waiting patients by doctor/room
+  const waitingByDoctor = waitingPatients.reduce((acc, apt) => {
+    const key = apt.doctorId || 'unknown';
+    if (!acc[key]) {
+      acc[key] = { doctorName: apt.doctorName || 'Doctor', room: apt.room || '1', patients: [] };
+    }
+    acc[key].patients.push(apt);
+    return acc;
+  }, {} as Record<string, { doctorName: string; room: string; patients: typeof waitingPatients }>);
+
+  // Get the first in-progress patient for announcements (legacy support)
   const currentPatient = inProgressPatients[0] || null;
 
   // Voice announcement - announce when patient changes and repeat every 5 minutes
@@ -165,37 +175,43 @@ export default function TVDisplayPage() {
 
       {/* Main Content - Two Column Layout */}
       <div className="flex-1 flex overflow-hidden p-4 gap-4">
-        {/* Left Column - Current Patient and Stats */}
+        {/* Left Column - Current Patients (per doctor) and Stats */}
         <div className="w-1/2 flex flex-col gap-4">
-          {/* Current Patient - Main focus */}
-          {!currentPatient ? (
+          {/* Current Patients - One card per doctor with in-progress patient */}
+          {inProgressPatients.length === 0 ? (
             <Card className="p-6 text-center bg-slate-800/50 border-slate-600">
               <p className="text-2xl text-slate-400">ప్రస్తుతం ఎవరూ లేరు</p>
               <p className="text-lg text-slate-500 mt-1">(No patients currently)</p>
             </Card>
           ) : (
-            <Card
-              className="p-6 bg-gradient-to-r from-teal-800 to-teal-900 border-teal-500/50"
-            >
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center text-4xl font-bold flex-shrink-0">
-                  {getTokenDisplay(currentPatient)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-3xl font-bold text-white truncate">
-                    {currentPatient.patient.firstName} {currentPatient.patient.lastName}
-                  </p>
-                  <p className="text-xl text-slate-300 font-mono mt-1">
-                    {currentPatient.patient.mrNumber}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <Badge className="text-2xl px-4 py-2 bg-[#b23438] text-white border-0">
-                    Room {currentPatient.room || '1'}
-                  </Badge>
-                </div>
-              </div>
-            </Card>
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {inProgressPatients.map((patient) => (
+                <Card
+                  key={patient.id}
+                  className="p-4 bg-gradient-to-r from-teal-800 to-teal-900 border-teal-500/50"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center text-3xl font-bold flex-shrink-0">
+                      {getTokenDisplay(patient)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-2xl font-bold text-white truncate">
+                        {patient.patient.firstName} {patient.patient.lastName}
+                      </p>
+                      <p className="text-sm text-slate-300 font-mono">
+                        {patient.patient.mrNumber}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <Badge className="text-lg px-3 py-1 bg-[#b23438] text-white border-0">
+                        Room {patient.room || '1'}
+                      </Badge>
+                      <p className="text-sm text-slate-400 mt-1">{patient.doctorName}</p>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
 
           {/* Stats */}
@@ -217,35 +233,44 @@ export default function TVDisplayPage() {
           </div>
         </div>
 
-        {/* Right Column - Waiting Queue */}
+        {/* Right Column - Waiting Queue grouped by Doctor/Room */}
         <div className="w-1/2 flex flex-col overflow-hidden">
           <div className="flex items-center gap-3 mb-3 flex-shrink-0">
             <Clock className="w-6 h-6 text-amber-400" />
             <h3 className="text-2xl font-bold text-amber-400">వేచి ఉన్న క్యూ</h3>
             <span className="text-lg text-slate-400">(Waiting Queue)</span>
           </div>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
             {waitingPatients.length === 0 ? (
               <Card className="p-6 text-center bg-slate-800/50 border-slate-600">
                 <p className="text-xl text-slate-400">వేచి ఉన్న రోగులు లేరు</p>
                 <p className="text-lg text-slate-500">(No waiting patients)</p>
               </Card>
             ) : (
-              waitingPatients.map((apt, index) => (
-                <Card key={apt.id} className="p-3 bg-slate-800/50 border-slate-600 hover:border-amber-500/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-amber-500/30 text-amber-400 flex items-center justify-center text-xl font-bold flex-shrink-0">
-                      {apt.tokenNumber || (todayAppointments.findIndex(a => a.id === apt.id) + 1)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-lg font-semibold text-white truncate">
-                        {apt.patient.firstName} {apt.patient.lastName}
-                      </p>
-                      <p className="text-sm text-slate-400 font-mono">{apt.patient.mrNumber}</p>
-                    </div>
-                    <p className="text-sm text-slate-400 flex-shrink-0">{apt.waitingTime || 0} min</p>
+              Object.entries(waitingByDoctor).map(([doctorId, group]) => (
+                <div key={doctorId} className="space-y-2">
+                  <div className="flex items-center gap-2 px-2">
+                    <Badge className="bg-teal-600 text-white border-0">Room {group.room}</Badge>
+                    <span className="text-sm text-slate-300">{group.doctorName}</span>
+                    <span className="text-xs text-slate-500">({group.patients.length} waiting)</span>
                   </div>
-                </Card>
+                  {group.patients.map((apt) => (
+                    <Card key={apt.id} className="p-3 bg-slate-800/50 border-slate-600 hover:border-amber-500/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-500/30 text-amber-400 flex items-center justify-center text-xl font-bold flex-shrink-0">
+                          {apt.tokenNumber || (todayAppointments.findIndex(a => a.id === apt.id) + 1)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-lg font-semibold text-white truncate">
+                            {apt.patient.firstName} {apt.patient.lastName}
+                          </p>
+                          <p className="text-sm text-slate-400 font-mono">{apt.patient.mrNumber}</p>
+                        </div>
+                        <p className="text-sm text-slate-400 flex-shrink-0">{apt.waitingTime || 0} min</p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               ))
             )}
           </div>
