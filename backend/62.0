@@ -1,0 +1,32 @@
+Collecting weasyprint
+  Downloading weasyprint-68.1-py3-none-any.whl.metadata (3.7 kB)
+Collecting pydyf>=0.11.0 (from weasyprint)
+  Downloading pydyf-0.12.1-py3-none-any.whl.metadata (2.5 kB)
+Requirement already satisfied: cffi>=0.6 in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from weasyprint) (2.0.0)
+Collecting tinyhtml5>=2.0.0b1 (from weasyprint)
+  Downloading tinyhtml5-2.0.0-py3-none-any.whl.metadata (2.9 kB)
+Requirement already satisfied: tinycss2>=1.5.0 in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from weasyprint) (1.5.1)
+Requirement already satisfied: cssselect2>=0.8.0 in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from weasyprint) (0.8.0)
+Collecting Pyphen>=0.9.1 (from weasyprint)
+  Downloading pyphen-0.17.2-py3-none-any.whl.metadata (3.2 kB)
+Requirement already satisfied: Pillow>=9.1.0 in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from weasyprint) (12.1.0)
+Collecting fonttools>=4.59.2 (from fonttools[woff]>=4.59.2->weasyprint)
+  Downloading fonttools-4.61.1-cp314-cp314-win_amd64.whl.metadata (116 kB)
+Requirement already satisfied: pycparser in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from cffi>=0.6->weasyprint) (3.0)
+Requirement already satisfied: webencodings in c:\users\kolat\appdata\local\programs\python\python314\lib\site-packages (from cssselect2>=0.8.0->weasyprint) (0.5.1)
+Collecting brotli>=1.0.1 (from fonttools[woff]>=4.59.2->weasyprint)
+  Downloading brotli-1.2.0-cp314-cp314-win_amd64.whl.metadata (6.3 kB)
+Collecting zopfli>=0.1.4 (from fonttools[woff]>=4.59.2->weasyprint)
+  Downloading zopfli-0.4.1-cp310-abi3-win_amd64.whl.metadata (3.6 kB)
+Downloading weasyprint-68.1-py3-none-any.whl (319 kB)
+Downloading fonttools-4.61.1-cp314-cp314-win_amd64.whl (2.3 MB)
+   ---------------------------------------- 2.3/2.3 MB 14.8 MB/s  0:00:00
+Downloading brotli-1.2.0-cp314-cp314-win_amd64.whl (375 kB)
+Downloading pydyf-0.12.1-py3-none-any.whl (8.0 kB)
+Downloading pyphen-0.17.2-py3-none-any.whl (2.1 MB)
+   ---------------------------------------- 2.1/2.1 MB 23.0 MB/s  0:00:00
+Downloading tinyhtml5-2.0.0-py3-none-any.whl (39 kB)
+Downloading zopfli-0.4.1-cp310-abi3-win_amd64.whl (102 kB)
+Installing collected packages: brotli, zopfli, tinyhtml5, Pyphen, pydyf, fonttools, weasyprint
+
+Successfully installed Pyphen-0.17.2 brotli-1.2.0 fonttools-4.61.1 pydyf-0.12.1 tinyhtml5-2.0.0 weasyprint-68.1 zopfli-0.4.1

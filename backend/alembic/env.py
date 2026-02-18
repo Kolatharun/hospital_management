@@ -32,6 +32,9 @@ from app.models import (  # noqa: F401
     LabQueueItem,
     PharmacyQueueItem,
     PatientDocument,
+    ComplaintMaster,
+    DiagnosisMaster,
+    LabTestMaster,
 )
 
 # Alembic Config object

@@ -88,9 +88,9 @@ def seed_doctors(db: Session, dept_map: dict) -> dict:
         {
             "name": "Dr. R. Balaji",
             "dept_code": "CARDIO",
-            "speciality": "Interventional Cardiology",
-            "qualification": "MD, DM (Cardiology)",
-            "registration_number": "MCI-12345",
+            "speciality": "Senior Interventional Cardiologist",
+            "qualification": "MD, DM, FSCAI (USA)",
+            "registration_number": "19870",
             "phone": "+91 9100079990",
             "email": "dr.balaji@balajiheart.com",
             "room": "1",
@@ -224,7 +224,7 @@ def seed_users(db: Session, doc_map: dict) -> None:
         db.flush()  # Get the user ID
 
         # Link the doctor record to this user (Doctor.user_id -> User.id)
-        balaji_doc = doc_map.get("MCI-12345")
+        balaji_doc = doc_map.get("19870")
         if balaji_doc:
             balaji_doc.user_id = doctor_user.id
             print(f"  ✓ Linked doctor user to Dr. R. Balaji (Doctor ID: {balaji_doc.id})")
@@ -234,7 +234,7 @@ def seed_users(db: Session, doc_map: dict) -> None:
     else:
         print("  - Doctor user already exists")
         # Still try to link existing user to doctor if not linked
-        balaji_doc = doc_map.get("MCI-12345")
+        balaji_doc = doc_map.get("19870")
         if balaji_doc and not balaji_doc.user_id:
             balaji_doc.user_id = existing_doc.id
             print(f"  ✓ Linked existing doctor user to Dr. R. Balaji")

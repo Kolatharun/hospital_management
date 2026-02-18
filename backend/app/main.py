@@ -25,6 +25,7 @@ from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
 from app.core.database import check_db_connection
+from app.core.startup import run_startup_initialization
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.patient_controller import router as patient_router
 from app.controllers.appointment_controller import router as appointment_router
@@ -53,6 +54,8 @@ async def lifespan(app: FastAPI):
     # Check database connection
     if check_db_connection():
         print("✓ Database connection successful")
+        # Initialize tables, folders, and default data (safe for production)
+        run_startup_initialization()
     else:
         print("✗ Database connection failed - check DATABASE_URL")
 

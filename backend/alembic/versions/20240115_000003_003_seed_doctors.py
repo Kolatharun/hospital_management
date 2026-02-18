@@ -22,15 +22,16 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add default doctors if they don't exist."""
 
-    # Check and insert doctors only if they don't exist (by registration_number)
+    # Check and insert doctors only if they don't exist (by registration_number or user_id)
     op.execute(text("""
         INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee, user_id)
         SELECT gen_random_uuid(), 'Dr. R. Balaji',
                (SELECT id FROM departments WHERE code = 'CARD'),
-               'Interventional Cardiology', 'MD, DM (Cardiology)', 'MCI-12345',
+               'Senior Interventional Cardiologist', 'MD, DM, FSCAI (USA)', '19870',
                '+91 9100079990', 'dr.balaji@balajiheart.com', '1', 500.00,
                (SELECT id FROM users WHERE username = 'doctor')
-        WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12345')
+        WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = '19870')
+          AND NOT EXISTS (SELECT 1 FROM doctors WHERE user_id = (SELECT id FROM users WHERE username = 'doctor'))
     """))
 
     op.execute(text("""
@@ -41,6 +42,7 @@ def upgrade() -> None:
                '+91 9100079991', 'dr.priya@balajiheart.com', '2', 450.00,
                (SELECT id FROM users WHERE username = 'priya')
         WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12346')
+          AND NOT EXISTS (SELECT 1 FROM doctors WHERE user_id = (SELECT id FROM users WHERE username = 'priya'))
     """))
 
     op.execute(text("""
@@ -51,6 +53,7 @@ def upgrade() -> None:
                '+91 9100079992', 'dr.rajesh@balajiheart.com', '3', 300.00,
                (SELECT id FROM users WHERE username = 'rajesh')
         WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE registration_number = 'MCI-12347')
+          AND NOT EXISTS (SELECT 1 FROM doctors WHERE user_id = (SELECT id FROM users WHERE username = 'rajesh'))
     """))
 
     op.execute(text("""
@@ -75,7 +78,7 @@ def upgrade() -> None:
     op.execute(text("""
         UPDATE doctors
         SET user_id = (SELECT id FROM users WHERE username = 'doctor')
-        WHERE registration_number = 'MCI-12345'
+        WHERE registration_number = '19870'
           AND user_id IS NULL
           AND EXISTS (SELECT 1 FROM users WHERE username = 'doctor')
     """))
@@ -101,5 +104,5 @@ def downgrade() -> None:
     """Remove seeded doctors."""
     op.execute(text("""
         DELETE FROM doctors
-        WHERE registration_number IN ('MCI-12345', 'MCI-12346', 'MCI-12347', 'MCI-12348', 'MCI-12349')
+        WHERE registration_number IN ('19870', 'MCI-12346', 'MCI-12347', 'MCI-12348', 'MCI-12349')
     """))

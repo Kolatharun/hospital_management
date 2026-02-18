@@ -30,6 +30,9 @@ python-dotenv>=1.0.0,<2.0.0
 # PDF Generation (for bill receipts)
 xhtml2pdf>=0.2.11,<1.0.0
 
+# PDF Generation (for prescriptions - supports modern CSS)
+playwright>=1.40.0,<2.0.0
+
 # HTTP Client (for WhatsApp API and testing)
 httpx>=0.26.0,<1.0.0
 

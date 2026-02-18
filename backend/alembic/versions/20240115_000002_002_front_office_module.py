@@ -424,32 +424,8 @@ def upgrade() -> None:
             (gen_random_uuid(), 'Gastroenterology', 'GAST', 500.00)
     """))
 
-    # Seed default doctors (linked to departments by code)
-    op.execute(text("""
-        INSERT INTO doctors (id, name, department_id, speciality, qualification, registration_number, phone, email, room, consultation_fee, user_id)
-        VALUES
-            (gen_random_uuid(), 'Dr. R. Balaji',
-             (SELECT id FROM departments WHERE code = 'CARD'),
-             'Interventional Cardiology', 'MD, DM (Cardiology)', 'MCI-12345',
-             '+91 9100079990', 'dr.balaji@balajiheart.com', '1', 500.00,
-             (SELECT id FROM users WHERE username = 'doctor')),
-            (gen_random_uuid(), 'Dr. Priya Sharma',
-             (SELECT id FROM departments WHERE code = 'CARD'),
-             'Non-Invasive Cardiology', 'MD, DM (Cardiology)', 'MCI-12346',
-             '+91 9100079991', 'dr.priya@balajiheart.com', '2', 450.00, NULL),
-            (gen_random_uuid(), 'Dr. Rajesh Kumar',
-             (SELECT id FROM departments WHERE code = 'GENM'),
-             'Internal Medicine', 'MD (Medicine)', 'MCI-12347',
-             '+91 9100079992', 'dr.rajesh@balajiheart.com', '3', 300.00, NULL),
-            (gen_random_uuid(), 'Dr. Lakshmi Devi',
-             (SELECT id FROM departments WHERE code = 'PEDI'),
-             'Pediatric Care', 'MD (Pediatrics)', 'MCI-12348',
-             '+91 9100079993', 'dr.lakshmi@balajiheart.com', '4', 350.00, NULL),
-            (gen_random_uuid(), 'Dr. Suresh Reddy',
-             (SELECT id FROM departments WHERE code = 'DERM'),
-             'Clinical Dermatology', 'MD (Dermatology)', 'MCI-12349',
-             '+91 9100079994', 'dr.suresh@balajiheart.com', '5', 350.00, NULL)
-    """))
+    # NOTE: Doctors are seeded by migration 003 and startup.py (idempotent)
+    # Removed duplicate INSERT here to avoid conflicts
 
     # Create sequence for MR numbers
     op.execute(text("CREATE SEQUENCE IF NOT EXISTS mr_number_seq START 1"))
