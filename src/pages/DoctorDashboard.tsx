@@ -107,6 +107,24 @@ export default function DoctorDashboard() {
     }
   };
 
+  // Sort appointments: Waiting first, then In Consultation, then Completed
+  const getStatusPriority = (status: Appointment['status']): number => {
+    switch (status) {
+      case 'waiting':
+        return 1;
+      case 'in-progress':
+        return 2;
+      case 'completed':
+        return 3;
+      default:
+        return 4;
+    }
+  };
+
+  const sortedAppointments = [...todayAppointments].sort((a, b) => {
+    return getStatusPriority(a.status) - getStatusPriority(b.status);
+  });
+
   if (view === 'prescription' && selectedAppointment) {
     return (
       <>
@@ -125,7 +143,7 @@ export default function DoctorDashboard() {
 
               <Button variant="outline" className="gap-2 btn-touch" onClick={() => prescriptionFormRef.current?.openDocuments()}>
                 <FileText className="w-4 h-4" />
-                Documents
+                Medical Report
               </Button>
             </div>
 
@@ -255,7 +273,7 @@ export default function DoctorDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {todayAppointments.map((appointment) => (
+                      {sortedAppointments.map((appointment) => (
                         <TableRow
                           key={appointment.id}
                           className={`hover:bg-muted/50 ${appointment.status === 'in-progress' ? 'bg-primary/5' : ''}`}

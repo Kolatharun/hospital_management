@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { FilePlus, User, Plus, Trash2, Save, Printer, Search, Clock, Mic, Send, Mail, MessageSquare, CheckCircle, FileText, ZoomIn, ZoomOut, X, Eye, ChevronDown, TestTube, Pill } from 'lucide-react';
+import { FilePlus, User, Plus, Trash2, Save, Printer, Search, Clock, Mic, Send, Mail, MessageSquare, CheckCircle, FileText, ZoomIn, ZoomOut, X, Eye, ChevronDown, TestTube, Pill, Phone as PhoneIcon, Globe } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import prescriptionHeader from '@/assets/prescription-header.jpeg';
 import prescriptionFooter from '@/assets/prescription-footer.jpeg';
@@ -1163,23 +1163,70 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         </TabsList>
 
         <TabsContent value="prescription" className="mt-4">
-          {/* Patient Header Info */}
-          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 mb-4">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className="text-[10px] text-muted-foreground uppercase">30 Years Experience in Treating BP and Heart Diseases</p>
+          {/* Doctor Header - Matching Reference Design */}
+          <Card className="bg-white border border-gray-200 mb-4 overflow-hidden">
+            <CardContent className="p-0">
+              {/* Tagline */}
+              <p className="text-center text-[#8B0000] text-sm font-medium italic py-3">
+                30 Years Experience in Treating BP and Heart Diseases
+              </p>
+
+              {/* Main Header Content */}
+              <div className="flex justify-between items-start px-6 pb-4">
+                {/* Left Side - Doctor Info */}
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                    {doctorProfile?.name || user?.name || 'Doctor'}
+                  </h2>
+                  <p className="text-gray-600 text-sm mb-1">
+                    {doctorProfile?.qualification || 'MD, DM, FSCAI (USA)'}
+                  </p>
+                  <p className="text-gray-600 text-sm mb-3">
+                    Regd No: {doctorProfile?.registration_number || '-'}
+                  </p>
+
+                  <p className="font-bold text-gray-900 mb-1">
+                    {doctorProfile?.speciality || 'Senior Interventional Cardiologist'}
+                  </p>
+                  <p className="text-gray-600 text-sm mb-3">
+                    Medicover Hospitals - Hitech City
+                  </p>
+
+                  {/* Contact Details */}
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p className="flex items-center gap-2">
+                      <PhoneIcon className="w-3 h-3" />
+                      {doctorProfile?.phone || '+91 9848098307'}
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Globe className="w-3 h-3" />
+                      www.balajiheartcenter.com
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Globe className="w-3 h-3" />
+                      www.facebook.com/balajiheartcenter
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-xl text-destructive">{doctorProfile?.name || user?.name || 'Doctor'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {doctorProfile?.qualification || ''}{doctorProfile?.registration_number ? ` | Regd No: ${doctorProfile.registration_number}` : ''}
+
+                {/* Right Side - Logo & Tagline */}
+                <div className="flex flex-col items-end">
+                  <img
+                    src={logo}
+                    alt="Balaji Heart Center"
+                    className="w-40 h-auto object-contain mb-2"
+                  />
+                  <p className="text-sm text-gray-600 font-medium">
+                    YES, THE 'ADVANTAGE' HEART CLINIC!
                   </p>
-                  <p className="text-sm font-medium">{doctorProfile?.speciality || ''}</p>
+                  <p className="text-sm text-[#8B0000] font-medium">
+                    మీ గుండె ఇక వదిలం
+                  </p>
                 </div>
               </div>
+
+              {/* Red Divider Line */}
+              <div className="h-1 bg-[#8B0000]"></div>
             </CardContent>
           </Card>
 
@@ -1218,96 +1265,130 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
           </Card>
 
           {/* Vitals Display (Read-only from Database with Fallback Support) */}
-          <Card className={`mb-4 ${isOldVitals ? 'bg-amber-50 border-amber-300' : 'bg-primary/5 border-primary/20'}`}>
-            <CardContent className="py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className={`text-sm font-semibold ${isOldVitals ? 'text-amber-700' : 'text-primary'}`}>
-                  {isOldVitals ? 'Old Vitals (From Previous Visit)' : 'Clinical Parameters'}
-                  {vitalsLoading && <span className="ml-2 text-muted-foreground animate-pulse">Loading...</span>}
-                </p>
-                {isOldVitals && sourceOpNumber && (
-                  <div className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded">
-                    From: {sourceOpNumber} {vitalsVisitDate && `(${new Date(vitalsVisitDate).toLocaleDateString('en-IN')})`}
-                  </div>
+          <div className="mb-5">
+            {/* Section Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                {isOldVitals ? 'Previous Visit Vitals' : 'Clinical Parameters'}
+                {vitalsLoading && (
+                  <span className="text-xs text-gray-400 font-normal animate-pulse ml-2">Loading...</span>
                 )}
-              </div>
-              {vitals ? (
-                <>
-                  <div className="grid grid-cols-7 gap-3 text-xs mb-3">
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">SPO2:</p>
-                      <p className="font-bold">{vitals.spo2 || '-'} %</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">PR:</p>
-                      <p className="font-bold">{vitals.pulse || '-'} mm/mt</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">CVS:</p>
-                      <p className="font-bold">{vitals.cvs || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">RS:</p>
-                      <p className="font-bold">{vitals.rs || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">JVP:</p>
-                      <p className="font-bold">{vitals.jvp || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">BP:</p>
-                      <p className="font-bold">{vitals.bloodPressure || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">Weight:</p>
-                      <p className="font-bold">{vitals.weight || '-'}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs font-semibold text-primary mb-2">Risk Factors</p>
-                  <div className="grid grid-cols-7 gap-3 text-xs">
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">HTN:</p>
-                      <p className="font-bold">{vitals.htn || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">DM:</p>
-                      <p className="font-bold">{vitals.dm || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">SMOKING:</p>
-                      <p className="font-bold">{vitals.smoking || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">HLP:</p>
-                      <p className="font-bold">{vitals.hlp || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">F H/O CAD:</p>
-                      <p className="font-bold">{vitals.familyHOCAD || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">HEART DISEASE:</p>
-                      <p className="font-bold">{vitals.heartDisease || '-'}</p>
-                    </div>
-                    <div className="bg-background p-2 rounded border">
-                      <p className="text-muted-foreground font-bold">PTCA/CABG:</p>
-                      <p className="font-bold">{vitals.ptcaCabg || '-'}</p>
-                    </div>
-                  </div>
-                  {vitals.currentDrugs && (
-                    <div className="mt-2 bg-background p-2 rounded border text-xs">
-                      <p className="text-muted-foreground font-bold">DRUGS:</p>
-                      <p className="font-bold">{vitals.currentDrugs}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-xs text-muted-foreground py-2">
-                  {vitalsLoading ? 'Fetching vitals from database...' : 'No vitals recorded for this patient.'}
-                </div>
+              </h3>
+              {isOldVitals && sourceOpNumber && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                  From: {sourceOpNumber} {vitalsVisitDate && `(${new Date(vitalsVisitDate).toLocaleDateString('en-IN')})`}
+                </span>
               )}
-            </CardContent>
-          </Card>
+            </div>
+
+            {vitals ? (
+              <div className="space-y-3">
+                {/* Row 1: Clinical Parameters - 7 Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {/* SPO2 */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">SPO2</p>
+                    <p className={`text-lg font-semibold ${vitals.spo2 && vitals.spo2 < 95 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {vitals.spo2 || '-'}{vitals.spo2 && <span className="text-xs font-normal text-gray-500 ml-0.5">%</span>}
+                    </p>
+                  </div>
+
+                  {/* PR */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">PR</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {vitals.pulse || '-'}{vitals.pulse && <span className="text-xs font-normal text-gray-500 ml-0.5">bpm</span>}
+                    </p>
+                  </div>
+
+                  {/* BP */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">BP</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {vitals.bloodPressure || '-'}
+                    </p>
+                  </div>
+
+                  {/* CVS */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">CVS</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.cvs || '-'}</p>
+                  </div>
+
+                  {/* RS */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">RS</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.rs || '-'}</p>
+                  </div>
+
+                  {/* JVP */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">JVP</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.jvp || '-'}</p>
+                  </div>
+
+                  {/* HLP */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">HLP</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.hlp || '-'}</p>
+                  </div>
+                </div>
+
+                {/* Row 2: Risk Factors - 7 Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {/* HTN */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">HTN</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.htn || '-'}</p>
+                  </div>
+
+                  {/* DM */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">DM</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.dm || '-'}</p>
+                  </div>
+
+                  {/* Smoking */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Smoking</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.smoking || '-'}</p>
+                  </div>
+
+                  {/* F H/O CAD */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">F H/O CAD</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.familyHOCAD || '-'}</p>
+                  </div>
+
+                  {/* PTCA/CABG */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">PTCA/CABG</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.ptcaCabg || '-'}</p>
+                  </div>
+
+                  {/* Heart Disease */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Heart Disease</p>
+                    <p className="text-lg font-semibold text-gray-900">{vitals.heartDisease || '-'}</p>
+                  </div>
+
+                  {/* Current Medications */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Medications</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate" title={vitals.currentDrugs || '-'}>
+                      {vitals.currentDrugs || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
+                <p className="text-sm text-gray-400">
+                  {vitalsLoading ? 'Fetching vitals from database...' : 'No vitals recorded for this patient.'}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Main Form */}
           <div className="grid grid-cols-1 gap-4">
