@@ -11,7 +11,6 @@ export default function TVDisplayPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastAnnouncedId, setLastAnnouncedId] = useState<string | null>(null);
   const [isAnnouncing, setIsAnnouncing] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const announcementIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-refresh every 30 seconds
@@ -45,7 +44,7 @@ export default function TVDisplayPage() {
       announcementIntervalRef.current = null;
     }
 
-    if (!currentPatient || !voiceEnabled) {
+    if (!currentPatient) {
       setLastAnnouncedId(null);
       return;
     }
@@ -76,22 +75,7 @@ export default function TVDisplayPage() {
         clearInterval(announcementIntervalRef.current);
       }
     };
-  }, [currentPatient?.id, todayAppointments, announcePatientCall, lastAnnouncedId, voiceEnabled]);
-
-  const handleEnableVoice = async () => {
-    // Browsers often block speech until a user gesture occurs.
-    // This click unlocks speech synthesis for the page.
-    setVoiceEnabled(true);
-    if (currentPatient) {
-      const opNumber = currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`;
-      const patientName = `${currentPatient.patient.firstName} ${currentPatient.patient.lastName}`;
-      const roomNumber = currentPatient.room || '1';
-      setIsAnnouncing(true);
-      await announcePatientCall(opNumber, patientName, roomNumber);
-      setIsAnnouncing(false);
-      setLastAnnouncedId(currentPatient.id);
-    }
-  };
+  }, [currentPatient?.id, todayAppointments, announcePatientCall, lastAnnouncedId]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-IN', {
@@ -150,24 +134,13 @@ export default function TVDisplayPage() {
           <h1 className="text-4xl font-bold italic text-green-400 tracking-wide">
             Outpatient Queue Display
           </h1>
-          {!voiceEnabled && (
-            <button
-              type="button"
-              onClick={handleEnableVoice}
-              className="mt-2 px-4 py-1 rounded-md bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors"
-            >
-              Enable Voice
-            </button>
-          )}
-          {voiceEnabled && (
-            <div className="flex items-center gap-2 mt-1">
-              {teluguVoiceAvailable ? (
-                <span className="text-green-400 text-xs">Voice: {teluguVoiceName}</span>
-              ) : (
-                <span className="text-red-400 text-xs">Telugu voice not found!</span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            {teluguVoiceAvailable ? (
+              <span className="text-green-400 text-xs">Voice: {teluguVoiceName}</span>
+            ) : (
+              <span className="text-red-400 text-xs">Telugu voice not found!</span>
+            )}
+          </div>
           {isAnnouncing && (
             <div className="flex items-center gap-2 mt-1">
               <Volume2 className="w-5 h-5 text-amber-400 animate-pulse" />

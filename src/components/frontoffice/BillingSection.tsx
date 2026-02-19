@@ -106,7 +106,13 @@ interface BillingSectionProps {
 }
 
 export function BillingSection({ pendingPatient, onBillingComplete }: BillingSectionProps) {
-  const { getTodayAppointments, addAppointment } = useClinicData();
+  const { getTodayAppointments, addAppointment, doctors } = useClinicData();
+
+  // Helper to get doctor's consultation fee by doctorId
+  const getDoctorConsultationFee = (doctorId: string): number => {
+    const doctor = doctors.find(d => d.id === doctorId);
+    return doctor?.effective_fee ?? CONSULTATION_FEES['Cardiology'] ?? 500;
+  };
   const { toast } = useToast();
 
   const [bills, setBills] = useState<Bill[]>([]);
@@ -197,8 +203,8 @@ export function BillingSection({ pendingPatient, onBillingComplete }: BillingSec
       // Auto-select the patient for billing
       setSelectedAppointment(virtualAppointment);
 
-      // Set default consultation fee
-      const fee = CONSULTATION_FEES['Cardiology'] || 500;
+      // Auto-populate consultation fee from doctor's effective_fee
+      const fee = getDoctorConsultationFee(pendingPatient.doctorId);
       setBillingForm({
         consultationFee: fee,
         otherCharges: '',
@@ -277,7 +283,8 @@ export function BillingSection({ pendingPatient, onBillingComplete }: BillingSec
 
   const handleSelectPatient = async (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    const fee = CONSULTATION_FEES['Cardiology'] || 500;
+    // Auto-populate consultation fee from doctor's effective_fee
+    const fee = getDoctorConsultationFee(appointment.doctorId);
     setBillingForm({
       consultationFee: fee,
       otherCharges: '',
@@ -435,7 +442,8 @@ export function BillingSection({ pendingPatient, onBillingComplete }: BillingSec
 
   const handleReset = () => {
     if (!selectedAppointment) return;
-    const fee = CONSULTATION_FEES['Cardiology'] || 500;
+    // Reset to doctor's consultation fee
+    const fee = getDoctorConsultationFee(selectedAppointment.doctorId);
     setBillingForm({
       consultationFee: fee,
       otherCharges: '',
@@ -1295,13 +1303,19 @@ export function BillingSection({ pendingPatient, onBillingComplete }: BillingSec
 
                 {/* Consultation Fee */}
                 <div className="space-y-2">
-                  <Label>Consultation Fees (₹) <span className="text-destructive">*</span></Label>
+                  <Label>
+                    Consultation Fees (₹) <span className="text-destructive">*</span>
+                    {(selectedAppointment || editingBill?.paymentStatus === 'paid') && (
+                      <span className="text-xs text-muted-foreground ml-2">(Auto-populated from doctor)</span>
+                    )}
+                  </Label>
                   <Input
                     type="number"
                     value={billingForm.consultationFee === 0 ? '' : billingForm.consultationFee}
                     onChange={(e) => setBillingForm(prev => ({ ...prev, consultationFee: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                    className="text-lg font-semibold"
+                    className={`text-lg font-semibold ${(selectedAppointment || editingBill?.paymentStatus === 'paid') ? 'bg-muted cursor-not-allowed' : ''}`}
                     placeholder="0"
+                    disabled={!!selectedAppointment || editingBill?.paymentStatus === 'paid'}
                   />
                 </div>
 

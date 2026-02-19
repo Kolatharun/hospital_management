@@ -127,6 +127,13 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const printRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Refs for auto-resizing textareas
+  const diagnosisTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const complaintTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const treatmentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const labTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const adviceTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   const [activeTab, setActiveTab] = useState('prescription');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
 
@@ -342,13 +349,13 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
             .filter(rx => rx.complaint && rx.complaint.trim())
             .map(rx => rx.complaint!.trim())
             .join('; ');
-          setHistory(previousComplaints || 'No previous visit history available');
+          setHistory(previousComplaints || 'NA');
         } else {
-          setHistory('No previous visit history available');
+          setHistory('NA');
         }
       } catch {
         setPatientHistory([]);
-        setHistory('No previous visit history available');
+        setHistory('NA');
       } finally {
         setHistoryLoading(false);
       }
@@ -473,6 +480,34 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     };
   }, []);
 
+  // Auto-resize textareas when their values change (e.g., from dropdown selection)
+  const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+  }, []);
+
+  useEffect(() => {
+    autoResizeTextarea(diagnosisTextareaRef.current);
+  }, [diagnosis, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(complaintTextareaRef.current);
+  }, [complaint, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(treatmentTextareaRef.current);
+  }, [manualMedicines, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(labTextareaRef.current);
+  }, [labTests, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(adviceTextareaRef.current);
+  }, [advice, autoResizeTextarea]);
+
   const filteredMedicines = COMMON_MEDICINES.filter(m =>
     m.toLowerCase().includes(medicineSearch.toLowerCase()) && medicineSearch.length >= 3
   );
@@ -561,17 +596,19 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
       // Store the prescription ID for send-to-patient
       setSavedPrescriptionId(savedRx.id);
 
-      // Generate and store PDF in backend folder (no download)
+      // Generate and store PDF in backend folder immediately (synchronous)
       try {
         await prescriptionService.generatePdf(savedRx.id);
         toast({
           title: 'Prescription Saved',
           description: 'Prescription saved and PDF generated successfully.',
         });
-      } catch {
+      } catch (pdfError) {
+        console.error('PDF generation failed:', pdfError);
         toast({
           title: 'Prescription Saved',
-          description: 'Prescription saved. PDF will be generated when sending to patient.',
+          description: 'Prescription saved but PDF generation failed. Please try printing manually.',
+          variant: 'destructive',
         });
       }
 
@@ -1303,13 +1340,10 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 </div>
               )}
               <Textarea
+                ref={diagnosisTextareaRef}
                 placeholder="Enter diagnosis..."
                 value={diagnosis}
-                onChange={(e) => {
-                  setDiagnosis(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
+                onChange={(e) => setDiagnosis(e.target.value)}
                 className="mt-2 min-h-[60px] resize-none overflow-hidden"
                 rows={2}
               />
@@ -1360,13 +1394,10 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 </div>
               )}
               <Textarea
+                ref={complaintTextareaRef}
                 placeholder="Type complaint or select from suggestions..."
                 value={complaint}
-                onChange={(e) => {
-                  setComplaint(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
+                onChange={(e) => setComplaint(e.target.value)}
                 className="mt-2 min-h-[60px] resize-none overflow-hidden"
                 rows={2}
               />
@@ -1446,13 +1477,10 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
               )}
 
               <Textarea
+                ref={treatmentTextareaRef}
                 placeholder="Type medicines manually..."
                 value={manualMedicines}
-                onChange={(e) => {
-                  setManualMedicines(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
+                onChange={(e) => setManualMedicines(e.target.value)}
                 className="mt-2 min-h-[60px] resize-none overflow-hidden"
                 rows={2}
               />
@@ -1486,13 +1514,10 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 </div>
               )}
               <Textarea
+                ref={labTextareaRef}
                 placeholder="Enter lab tests..."
                 value={labTests}
-                onChange={(e) => {
-                  setLabTests(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
+                onChange={(e) => setLabTests(e.target.value)}
                 className="mt-2 min-h-[60px] resize-none overflow-hidden"
                 rows={2}
               />
@@ -1502,13 +1527,10 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
             <div>
               <Label className="text-base font-semibold">Advice</Label>
               <Textarea
+                ref={adviceTextareaRef}
                 placeholder="Enter advice..."
                 value={advice}
-                onChange={(e) => {
-                  setAdvice(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
+                onChange={(e) => setAdvice(e.target.value)}
                 className="mt-1 min-h-[60px] resize-none overflow-hidden"
                 rows={3}
               />

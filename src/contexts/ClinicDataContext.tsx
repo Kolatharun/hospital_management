@@ -336,21 +336,19 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
   // Fetch initial data only when authenticated
   useEffect(() => {
     // Don't fetch if auth is still loading or user is not authenticated
-    if (authLoading) {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      // Clear data when not authenticated
-      setPatients([]);
-      setAppointments([]);
-      setPrescriptions([]);
-      setVitalsRecords([]);
-      setLabQueue([]);
-      setPharmacyQueue([]);
-      setDepartments([]);
-      setDoctors([]);
-      setIsLoading(false);
+    if (!isAuthenticated || authLoading) {
+      // Clear data when not authenticated (but auth loading is complete)
+      if (!authLoading && !isAuthenticated) {
+        setPatients([]);
+        setAppointments([]);
+        setPrescriptions([]);
+        setVitalsRecords([]);
+        setLabQueue([]);
+        setPharmacyQueue([]);
+        setDepartments([]);
+        setDoctors([]);
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -418,15 +416,17 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
 
   // Refresh functions
   const refreshPatients = useCallback(async () => {
+    if (!isAuthenticated || authLoading) return;
     try {
       const data = await patientService.getTodayRegistrations();
       setPatients(data.map(mapApiPatientToPatient));
     } catch (err) {
       console.error('Failed to refresh patients:', err);
     }
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   const refreshAppointments = useCallback(async () => {
+    if (!isAuthenticated || authLoading) return;
     try {
       // Filter appointments by doctor if user is a doctor
       const doctorIdFilter = user?.role === 'doctor' && user?.doctorId ? user.doctorId : undefined;
@@ -457,25 +457,27 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
     }
-  }, [patients, user]);
+  }, [patients, user, isAuthenticated, authLoading]);
 
   const refreshLabQueue = useCallback(async () => {
+    if (!isAuthenticated || authLoading) return;
     try {
       const data = await queueService.getLabQueue();
       setLabQueue(data.map(mapApiLabQueueToLabQueueItem));
     } catch (err) {
       console.error('Failed to refresh lab queue:', err);
     }
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   const refreshPharmacyQueue = useCallback(async () => {
+    if (!isAuthenticated || authLoading) return;
     try {
       const data = await queueService.getPharmacyQueue();
       setPharmacyQueue(data.map(mapApiPharmacyQueueToPharmacyQueueItem));
     } catch (err) {
       console.error('Failed to refresh pharmacy queue:', err);
     }
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   // Auto-refresh polling: keep appointments, lab queue, pharmacy queue in sync every 15 seconds
   useEffect(() => {

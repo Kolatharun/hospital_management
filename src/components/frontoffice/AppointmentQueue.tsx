@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useClinicData, Appointment, LabQueueItem, PharmacyQueueItem } from '@/contexts/ClinicDataContext';
-import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Clock, Phone, TestTube, Pill, Stethoscope, Plus, MessageSquare, Mail, Check } from 'lucide-react';
+import { Users, Clock, Phone, TestTube, Pill, Stethoscope, Plus, MessageSquare, Mail, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function AppointmentQueue() {
@@ -20,11 +19,11 @@ export function AppointmentQueue() {
     updatePharmacyQueueStatus,
     refreshAppointments,
   } = useClinicData();
-  const { announcePatientCall, announceLabCall, announcePharmacyCall } = useVoiceAnnouncement();
   const { toast } = useToast();
 
   const [activeQueue, setActiveQueue] = useState<'main' | 'lab' | 'pharmacy'>('main');
   const [callingId, setCallingId] = useState<string | null>(null);
+  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
 
   const todayAppointments = getTodayAppointments();
   const waitingAppointments = todayAppointments.filter(a => a.status === 'waiting');
@@ -78,9 +77,6 @@ export function AppointmentQueue() {
 
       const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`;
       const roomNumber = appointment.room || '-';
-      const opNumber = appointment.opNumber || `OP-${appointment.tokenNumber}`;
-
-      announcePatientCall(opNumber, patientName, roomNumber);
 
       toast({
         title: 'Patient Called',
@@ -116,7 +112,6 @@ export function AppointmentQueue() {
   const handleLabCall = async (item: LabQueueItem) => {
     try {
       await updateLabQueueStatus(item.id, 'in-progress');
-      announceLabCall(item.opNumber, item.patientName);
     } catch {
       toast({ title: 'Error', description: 'Failed to update lab queue status', variant: 'destructive' });
     }
@@ -133,7 +128,6 @@ export function AppointmentQueue() {
   const handlePharmacyCall = async (item: PharmacyQueueItem) => {
     try {
       await updatePharmacyQueueStatus(item.id, 'in-progress');
-      announcePharmacyCall(item.opNumber, item.patientName);
     } catch {
       toast({ title: 'Error', description: 'Failed to update pharmacy queue status', variant: 'destructive' });
     }
@@ -168,9 +162,11 @@ export function AppointmentQueue() {
   return (
     <div className="medical-section space-y-6">
       {/* Now Serving Banners - One per doctor with in-progress patient */}
-      {inProgressAppointments.length > 0 && (
+      {inProgressAppointments.filter(apt => !dismissedBanners.has(apt.id)).length > 0 && (
         <div className="space-y-3">
-          {inProgressAppointments.map((currentPatient) => (
+          {inProgressAppointments
+            .filter(apt => !dismissedBanners.has(apt.id))
+            .map((currentPatient) => (
             <div key={currentPatient.id} className="now-serving-banner flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div>
@@ -197,6 +193,15 @@ export function AppointmentQueue() {
                   <p className="text-2xl font-bold">{currentPatient.doctorName || '-'}</p>
                 </div>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white/80 hover:text-white hover:bg-white/20 ml-4"
+                onClick={() => setDismissedBanners(prev => new Set(prev).add(currentPatient.id))}
+                title="Dismiss banner"
+              >
+                <X className="w-5 h-5" />
+              </Button>
             </div>
           ))}
         </div>
