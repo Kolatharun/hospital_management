@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, Stethoscope, User } from 'lucide-react';
+import { LogOut, Stethoscope, User, Shield } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 
 export function Header() {
@@ -9,9 +9,18 @@ export function Header() {
 
   if (!user) return null;
 
-  const roleLabel = user.role === 'doctor' ? 'Doctor' : 'Out Patient (OP)';
-  const roleIcon = user.role === 'doctor' ? Stethoscope : User;
-  const RoleIcon = roleIcon;
+  const getRoleDisplay = () => {
+    switch (user.role) {
+      case 'admin':
+        return { label: 'Admin', icon: Shield };
+      case 'doctor':
+        return { label: 'Doctor', icon: Stethoscope };
+      default:
+        return { label: 'Out Patient (OP)', icon: User };
+    }
+  };
+
+  const { label: roleLabel, icon: RoleIcon } = getRoleDisplay();
 
   return (
     <header className="bg-card border-b border-border sticky top-0 z-50 no-print">

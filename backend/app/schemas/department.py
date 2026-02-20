@@ -79,6 +79,7 @@ class DoctorUpdate(BaseModel):
 
     name: Optional[str] = Field(default=None, max_length=200)
     department_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None
     speciality: Optional[str] = Field(default=None, max_length=100)
     qualification: Optional[str] = Field(default=None, max_length=200)
     registration_number: Optional[str] = Field(default=None, max_length=50)

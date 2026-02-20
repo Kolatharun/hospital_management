@@ -136,6 +136,12 @@ class UserResponse(BaseModel):
         description="Associated doctor ID (if role is doctor)",
     )
 
+    # Flag to indicate if doctor profile is linked (for role=doctor users)
+    doctor_linked: bool = Field(
+        True,
+        description="Whether doctor profile is linked to this user (only relevant for doctor role)",
+    )
+
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -148,6 +154,7 @@ class UserResponse(BaseModel):
                 "is_active": True,
                 "last_login": "2024-01-15T10:30:00Z",
                 "doctor_id": "660e8400-e29b-41d4-a716-446655440001",
+                "doctor_linked": True,
             }
         }
 
@@ -220,8 +227,8 @@ class UserCreate(BaseModel):
         ...,
         min_length=3,
         max_length=100,
-        pattern=r"^[a-zA-Z0-9_]+$",
-        description="Username (alphanumeric and underscores only)",
+        pattern=r"^[a-zA-Z0-9_.]+$",
+        description="Username (alphanumeric, underscores, and dots allowed)",
     )
 
     password: str = Field(
@@ -252,7 +259,7 @@ class UserCreate(BaseModel):
     @classmethod
     def validate_role(cls, v: str) -> str:
         """Validate role is one of the allowed values."""
-        allowed_roles = ["front-office", "doctor"]
+        allowed_roles = ["admin", "front-office", "doctor"]
         if v not in allowed_roles:
             raise ValueError(f"Role must be one of: {allowed_roles}")
         return v

@@ -10,6 +10,7 @@ interface User {
   username: string;
   email: string | null;
   doctorId: string | null;
+  doctorLinked: boolean;
 }
 
 interface AuthContextType {
@@ -30,6 +31,7 @@ function mapUserResponseToUser(response: UserResponse): User {
     username: response.username,
     email: response.email,
     doctorId: response.doctor_id,
+    doctorLinked: response.doctor_linked,
   };
 }
 

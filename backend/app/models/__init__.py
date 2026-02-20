@@ -42,6 +42,9 @@ from app.models.document import PatientDocument
 # Master data tables
 from app.models.master_data import ComplaintMaster, DiagnosisMaster, LabTestMaster
 
+# Medicine master
+from app.models.medicine import MedicineMaster
+
 __all__ = [
     # Base
     "BaseModel",
@@ -82,4 +85,6 @@ __all__ = [
     "ComplaintMaster",
     "DiagnosisMaster",
     "LabTestMaster",
+    # Medicine
+    "MedicineMaster",
 ]

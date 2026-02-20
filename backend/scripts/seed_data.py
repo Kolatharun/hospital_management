@@ -187,12 +187,29 @@ def seed_users(db: Session, doc_map: dict) -> None:
     print("\nSeeding demo users...")
 
     # Check if users already exist
+    existing_admin = db.query(User).filter(User.username == "admin").first()
     existing_fo = db.query(User).filter(User.username == "frontoffice").first()
     existing_doc = db.query(User).filter(User.username == "doctor").first()
     existing_priya = db.query(User).filter(User.username == "priya").first()
     existing_rajesh = db.query(User).filter(User.username == "rajesh").first()
 
     users_created = 0
+
+    # Admin user - required for admin module access
+    if not existing_admin:
+        admin_user = User(
+            username="admin",
+            password_hash=get_password_hash("admin123"),
+            display_name="System Administrator",
+            email="admin@balajiheart.com",
+            role=UserRole.ADMIN,
+            is_active=True,
+        )
+        db.add(admin_user)
+        users_created += 1
+        print("  ✓ Created admin user: admin / admin123")
+    else:
+        print("  - Admin user already exists")
 
     # Front Office user
     if not existing_fo:
@@ -325,6 +342,7 @@ def main():
         print("✓ Seed completed successfully!")
         print("=" * 50)
         print("\nDemo Credentials:")
+        print("  Admin: admin / admin123")
         print("  Front Office: frontoffice / front123")
         print("  Doctor (Dr. R. Balaji): doctor / doctor123")
         print("  Doctor (Dr. Priya Sharma): priya / priya123")

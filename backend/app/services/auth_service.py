@@ -416,6 +416,8 @@ class AuthService:
         """
         # Get doctor_id if user is a doctor
         doctor_id = None
+        doctor_linked = True  # Default to True for non-doctor roles
+
         if user.is_doctor:
             doctor = self.db.query(Doctor).filter(
                 Doctor.user_id == user.id,
@@ -423,6 +425,10 @@ class AuthService:
             ).first()
             if doctor:
                 doctor_id = doctor.id
+                doctor_linked = True
+            else:
+                # User has doctor role but no linked Doctor record
+                doctor_linked = False
 
         return UserResponse(
             id=user.id,
@@ -433,4 +439,5 @@ class AuthService:
             is_active=user.is_active,
             last_login=user.last_login,
             doctor_id=doctor_id,
+            doctor_linked=doctor_linked,
         )

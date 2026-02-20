@@ -5,7 +5,7 @@
 
 import api from './api';
 
-export type UserRole = 'front-office' | 'doctor';
+export type UserRole = 'admin' | 'front-office' | 'doctor';
 
 export interface LoginRequest {
   username: string;
@@ -28,6 +28,7 @@ export interface UserResponse {
   is_active: boolean;
   last_login: string | null;
   doctor_id: string | null;
+  doctor_linked: boolean;
 }
 
 export interface LoginResponse {

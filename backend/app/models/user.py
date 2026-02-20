@@ -32,10 +32,12 @@ class UserRole(str, enum.Enum):
     User roles derived from frontend LoginPage.tsx.
 
     Quick login buttons show two distinct roles:
+    - Admin: Full system access, user management, settings
     - Front Office: Access to registration, billing, vitals, queue
     - Doctor: Access to prescriptions, consultations, patient history
     """
 
+    ADMIN = "admin"
     FRONT_OFFICE = "front-office"
     DOCTOR = "doctor"
 
@@ -116,6 +118,11 @@ class User(BaseModel):
     def update_last_login(self) -> None:
         """Update the last_login timestamp to now."""
         self.last_login = datetime.now(timezone.utc)
+
+    @property
+    def is_admin(self) -> bool:
+        """Check if user has admin role."""
+        return self.role == UserRole.ADMIN
 
     @property
     def is_doctor(self) -> bool:

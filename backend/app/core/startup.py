@@ -185,6 +185,25 @@ def seed_doctors(db: Session, dept_map: dict) -> dict:
     return doc_map
 
 
+def seed_admin_user(db: Session) -> None:
+    """Create admin user if it doesn't exist."""
+    from app.models.user import User, UserRole
+
+    existing_admin = db.query(User).filter(User.username == "admin").first()
+    if not existing_admin:
+        admin_user = User(
+            username="admin",
+            password_hash=get_password_hash("admin123"),
+            display_name="System Administrator",
+            email="admin@balajiheart.com",
+            role=UserRole.ADMIN,
+            is_active=True,
+        )
+        db.add(admin_user)
+        db.flush()
+        print("  ✓ Created admin user (username: admin, password: admin123)")
+
+
 def seed_users(db: Session, doc_map: dict) -> None:
     """Create default users if they don't exist."""
     from app.models.user import User, UserRole
@@ -299,6 +318,7 @@ def run_startup_initialization() -> None:
     print("[Startup] Checking default data...")
     db = SessionLocal()
     try:
+        seed_admin_user(db)
         dept_map = seed_departments(db)
         doc_map = seed_doctors(db, dept_map)
         seed_users(db, doc_map)

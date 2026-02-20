@@ -37,6 +37,7 @@ from app.controllers.prescription_controller import router as prescription_route
 from app.controllers.doctor_controller import router as doctor_router
 from app.controllers.document_controller import router as document_router
 from app.controllers.master_data_controller import router as master_router
+from app.controllers.admin_controller import router as admin_router
 from app.schemas.common import HealthCheckResponse, ErrorResponse
 
 
@@ -79,10 +80,12 @@ Backend API for the Balaji Heart Center Hospital Management System.
 - **Doctor Module**: Prescriptions, consultations, patient history
 
 ### Roles
+- **Admin**: Full system access, user management, settings
 - **Front Office**: Access to registration, billing, vitals, queue management
 - **Doctor**: Access to prescriptions, consultations, patient queue
 
 ### Demo Credentials
+- **Admin**: username=`admin`, password=`admin123`
 - **Front Office**: username=`frontoffice`, password=`front123`
 - **Doctor**: username=`doctor`, password=`doctor123`
 
@@ -230,6 +233,9 @@ app.include_router(document_router, prefix=settings.API_V1_PREFIX)
 
 # Master Data Management
 app.include_router(master_router, prefix=settings.API_V1_PREFIX)
+
+# Admin Module
+app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
 
 
 # ============================================================

@@ -5,18 +5,20 @@ import { PatientHistory } from '@/components/doctor/PatientHistory';
 import { PrescriptionForm } from '@/components/doctor/PrescriptionForm';
 import type { PrescriptionFormRef } from '@/components/doctor/PrescriptionForm';
 import { useClinicData, Appointment } from '@/contexts/ClinicDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
-import { Users, Clock, FileText, Stethoscope, ArrowLeft, Phone, Plus, Volume2 } from 'lucide-react';
+import { Users, Clock, FileText, Stethoscope, ArrowLeft, Phone, Plus, Volume2, AlertTriangle } from 'lucide-react';
 
 export default function DoctorDashboard() {
   const [view, setView] = useState<'dashboard' | 'prescription' | 'history'>('dashboard');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const prescriptionFormRef = useRef<PrescriptionFormRef>(null);
+  const { user } = useAuth();
   const {
     getTodayAppointments,
     updateAppointmentStatus,
@@ -25,6 +27,9 @@ export default function DoctorDashboard() {
   } = useClinicData();
   const { toast } = useToast();
   const { announcePatientCall } = useVoiceAnnouncement();
+
+  // Check if doctor profile is linked
+  const isDoctorLinked = user?.role === 'doctor' ? user.doctorLinked : true;
 
   const handleTestVoice = async () => {
     toast({
@@ -173,6 +178,37 @@ export default function DoctorDashboard() {
             </Button>
             <PatientHistory selectedAppointment={selectedAppointment} />
           </div>
+        </PageContainer>
+      </>
+    );
+  }
+
+  // Show warning if doctor profile is not linked
+  if (!isDoctorLinked) {
+    return (
+      <>
+        <Header />
+        <PageContainer
+          title="Doctor Dashboard"
+          description="Manage patient consultations and prescriptions"
+        >
+          <Card className="border-2 border-destructive/30 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
+                <h2 className="text-2xl font-bold text-destructive mb-2">
+                  Doctor Profile Not Linked
+                </h2>
+                <p className="text-muted-foreground max-w-md mb-4">
+                  Your user account is not linked to a doctor profile.
+                  You cannot access the patient queue or prescriptions until your profile is linked.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Please contact the administrator to link your account to a doctor profile.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </PageContainer>
       </>
     );

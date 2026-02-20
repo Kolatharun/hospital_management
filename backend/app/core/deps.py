@@ -186,9 +186,26 @@ class RoleChecker:
 
 
 # Pre-configured role checkers for common use cases
+require_admin = RoleChecker([UserRole.ADMIN])
 require_front_office = RoleChecker([UserRole.FRONT_OFFICE])
 require_doctor = RoleChecker([UserRole.DOCTOR])
 require_any_role = RoleChecker([UserRole.FRONT_OFFICE, UserRole.DOCTOR])
+require_any_clinical = RoleChecker([UserRole.ADMIN, UserRole.FRONT_OFFICE, UserRole.DOCTOR])
+
+
+def get_admin_user(
+    current_user: User = Depends(require_admin),
+) -> User:
+    """
+    Dependency for admin only endpoints.
+
+    Maps to: AdminDashboard.tsx screens
+    - User Management
+    - Doctor Management
+    - Medicine Management
+    - System Settings
+    """
+    return current_user
 
 
 def get_front_office_user(
@@ -265,7 +282,7 @@ async def get_current_doctor(
         Doctor object linked to the user
 
     Raises:
-        HTTPException 404: If no doctor record found for user
+        HTTPException 403: If no doctor record found for user (profile not linked)
     """
     doctor = db.query(Doctor).filter(
         Doctor.user_id == current_user.id,
@@ -274,8 +291,8 @@ async def get_current_doctor(
 
     if not doctor:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor profile not found for this user",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Doctor profile not linked. Please contact admin.",
         )
 
     return doctor
