@@ -123,7 +123,7 @@ export default function FrontOfficeDashboard() {
     <>
       <Header />
       <PageContainer
-        title="Out Patient Dashboard (OP)"
+        title="OP Dashboard"
         description="Manage patient registration, appointments, and queue"
         actions={tvDisplayButton}
       >

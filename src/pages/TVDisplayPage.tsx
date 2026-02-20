@@ -6,7 +6,7 @@ import logo from '@/assets/logo.jpeg';
 
 export default function TVDisplayPage() {
   const { getTodayAppointments } = useClinicData();
-  const { announcePatientCall, teluguVoiceAvailable, teluguVoiceName } = useVoiceAnnouncement();
+  const { announcePatientCall, teluguVoiceAvailable, englishVoiceAvailable, teluguVoiceName, englishVoiceName } = useVoiceAnnouncement();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastAnnouncedId, setLastAnnouncedId] = useState<string | null>(null);
@@ -134,11 +134,17 @@ export default function TVDisplayPage() {
           <h1 className="text-4xl font-bold italic text-green-400 tracking-wide">
             Outpatient Queue Display
           </h1>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap justify-center">
             {teluguVoiceAvailable ? (
-              <span className="text-green-400 text-xs">Voice: {teluguVoiceName}</span>
+              <span className="text-green-400 text-xs">Telugu: {teluguVoiceName}</span>
             ) : (
               <span className="text-red-400 text-xs">Telugu voice not found!</span>
+            )}
+            <span className="text-slate-500 text-xs">|</span>
+            {englishVoiceAvailable ? (
+              <span className="text-green-400 text-xs">English: {englishVoiceName}</span>
+            ) : (
+              <span className="text-red-400 text-xs">English voice not found!</span>
             )}
           </div>
           {isAnnouncing && (

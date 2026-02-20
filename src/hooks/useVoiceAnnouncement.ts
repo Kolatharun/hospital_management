@@ -1,133 +1,143 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
 
-// Telugu female voice announcement hook
-// Ensures announcements are ONLY in Telugu with female voice preference
+interface VoiceConfig {
+  telugu: SpeechSynthesisVoice | null;
+  english: SpeechSynthesisVoice | null;
+}
+
+// Bilingual female voice announcement hook
+// Announces in Telugu and English with female voice preference
 export function useVoiceAnnouncement() {
   const speakingRef = useRef(false);
-  const [teluguVoice, setTeluguVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [voices, setVoices] = useState<VoiceConfig>({ telugu: null, english: null });
   const [voicesLoaded, setVoicesLoaded] = useState(false);
 
-  // Initialize and find Telugu female voice on mount
+  // Female voice indicators for voice selection
+  const femaleIndicators = [
+    'female',
+    'woman',
+    'zira',      // Microsoft English female
+    'susan',     // English female
+    'samantha',  // English female
+    'victoria',  // English female
+    'karen',     // English female (Australian)
+    'moira',     // English female (Irish)
+    'fiona',     // English female (Scottish)
+    'shruti',    // Microsoft Telugu female
+    'priya',
+    'lakshmi',
+    'anusha',
+    'swathi',
+    'kavitha',
+    'divya',
+    'anjali',
+    'sunitha',
+  ];
+
+  // Initialize and find female voices for both languages
   useEffect(() => {
     if (!('speechSynthesis' in window)) {
       console.error('Speech synthesis not supported in this browser');
       return;
     }
 
-    const findTeluguFemaleVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-
-      if (voices.length === 0) {
-        return null;
-      }
-
-      // Log ALL available voices for debugging
-      console.log('=== ALL AVAILABLE VOICES ===');
-      voices.forEach((v, i) => {
-        console.log(`${i}: ${v.name} | lang: ${v.lang} | local: ${v.localService}`);
-      });
-
-      // Filter for Telugu voices only (te-IN, te, or contains "telugu")
-      const teluguVoices = voices.filter((v) => {
+    const findFemaleVoice = (
+      voiceList: SpeechSynthesisVoice[],
+      langPrefix: string,
+      langIndicators: string[]
+    ): SpeechSynthesisVoice | null => {
+      // Filter voices by language
+      const filteredVoices = voiceList.filter((v) => {
         const lang = (v.lang || '').toLowerCase();
         const name = (v.name || '').toLowerCase();
         return (
-          lang === 'te-in' ||
-          lang === 'te' ||
-          lang.startsWith('te-') ||
-          name.includes('telugu') ||
-          name.includes('తెలుగు')
+          lang.startsWith(langPrefix) ||
+          langIndicators.some(ind => name.includes(ind) || lang.includes(ind))
         );
       });
 
-      console.log('=== TELUGU VOICES FOUND ===');
-      teluguVoices.forEach((v, i) => {
-        console.log(`${i}: ${v.name} | lang: ${v.lang}`);
-      });
+      if (filteredVoices.length === 0) return null;
 
-      if (teluguVoices.length === 0) {
-        console.error('NO TELUGU VOICES AVAILABLE! Please install Telugu language pack.');
-        console.error('On Windows: Settings > Time & Language > Language > Add Telugu');
-        console.error('On Chrome: Telugu Google voice should be available by default');
-        return null;
-      }
-
-      // Female voice indicators - prioritized list
-      const femaleIndicators = [
-        'female',
-        'woman',
-        'shruti',    // Microsoft Telugu female voice
-        'priya',
-        'lakshmi',
-        'anusha',
-        'swathi',
-        'kavitha',
-        'divya',
-        'anjali',
-        'sunitha',
-      ];
-
-      // Priority 1: Explicit female Telugu voice
-      let selected = teluguVoices.find((v) => {
+      // Priority 1: Explicit female voice
+      let selected = filteredVoices.find((v) => {
         const name = (v.name || '').toLowerCase();
         return femaleIndicators.some(indicator => name.includes(indicator));
       });
 
-      if (selected) {
-        console.log('✓ Selected FEMALE Telugu voice:', selected.name);
-        return selected;
-      }
+      if (selected) return selected;
 
-      // Priority 2: Google Telugu voice (usually female-sounding)
-      selected = teluguVoices.find((v) => {
+      // Priority 2: Google voice (usually natural/female-sounding)
+      selected = filteredVoices.find((v) => {
         const name = (v.name || '').toLowerCase();
         return name.includes('google');
       });
 
-      if (selected) {
-        console.log('✓ Selected Google Telugu voice:', selected.name);
-        return selected;
-      }
+      if (selected) return selected;
 
-      // Priority 3: Microsoft Telugu voice (check for Shruti specifically)
-      selected = teluguVoices.find((v) => {
-        const name = (v.name || '').toLowerCase();
-        return name.includes('microsoft') && name.includes('shruti');
-      });
-
-      if (selected) {
-        console.log('✓ Selected Microsoft Shruti Telugu voice:', selected.name);
-        return selected;
-      }
-
-      // Priority 4: Any Microsoft Telugu voice
-      selected = teluguVoices.find((v) => {
+      // Priority 3: Microsoft voice
+      selected = filteredVoices.find((v) => {
         const name = (v.name || '').toLowerCase();
         return name.includes('microsoft');
       });
 
-      if (selected) {
-        console.log('✓ Selected Microsoft Telugu voice:', selected.name);
-        return selected;
+      if (selected) return selected;
+
+      // Fallback: First available voice
+      return filteredVoices[0];
+    };
+
+    const loadVoices = () => {
+      const availableVoices = window.speechSynthesis.getVoices();
+
+      if (availableVoices.length === 0) return null;
+
+      // Log all available voices for debugging
+      console.log('=== ALL AVAILABLE VOICES ===');
+      availableVoices.forEach((v, i) => {
+        console.log(`${i}: ${v.name} | lang: ${v.lang} | local: ${v.localService}`);
+      });
+
+      // Find Telugu female voice
+      const teluguVoice = findFemaleVoice(
+        availableVoices,
+        'te',
+        ['telugu', 'తెలుగు']
+      );
+
+      // Find English female voice
+      const englishVoice = findFemaleVoice(
+        availableVoices,
+        'en',
+        ['english']
+      );
+
+      if (teluguVoice) {
+        console.log('✓ Selected Telugu voice:', teluguVoice.name);
+      } else {
+        console.error('NO TELUGU VOICES AVAILABLE! Please install Telugu language pack.');
       }
 
-      // Fallback: First available Telugu voice
-      console.log('✓ Using first available Telugu voice:', teluguVoices[0].name);
-      return teluguVoices[0];
+      if (englishVoice) {
+        console.log('✓ Selected English voice:', englishVoice.name);
+      } else {
+        console.error('NO ENGLISH VOICES AVAILABLE!');
+      }
+
+      return { telugu: teluguVoice, english: englishVoice };
     };
 
     // Try to get voices immediately
-    let voice = findTeluguFemaleVoice();
-    if (voice) {
-      setTeluguVoice(voice);
+    const loadedVoices = loadVoices();
+    if (loadedVoices) {
+      setVoices(loadedVoices);
       setVoicesLoaded(true);
     }
 
-    // Also listen for voices changed event (Chrome loads voices async)
+    // Listen for voices changed event (Chrome loads voices async)
     const handleVoicesChanged = () => {
-      const foundVoice = findTeluguFemaleVoice();
-      if (foundVoice) {
-        setTeluguVoice(foundVoice);
+      const foundVoices = loadVoices();
+      if (foundVoices) {
+        setVoices(foundVoices);
         setVoicesLoaded(true);
       }
     };
@@ -141,9 +151,9 @@ export function useVoiceAnnouncement() {
     retryIntervals.forEach((delay) => {
       const timeout = setTimeout(() => {
         if (!voicesLoaded) {
-          const foundVoice = findTeluguFemaleVoice();
-          if (foundVoice) {
-            setTeluguVoice(foundVoice);
+          const foundVoices = loadVoices();
+          if (foundVoices) {
+            setVoices(foundVoices);
             setVoicesLoaded(true);
           }
         }
@@ -157,8 +167,11 @@ export function useVoiceAnnouncement() {
     };
   }, [voicesLoaded]);
 
-  // Core speak function - ONLY speaks in Telugu
-  const speak = useCallback((text: string): Promise<void> => {
+  // Core speak function with language support
+  const speak = useCallback((
+    text: string,
+    language: 'telugu' | 'english'
+  ): Promise<void> => {
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window)) {
         console.error('Speech synthesis not supported');
@@ -173,44 +186,32 @@ export function useVoiceAnnouncement() {
       setTimeout(() => {
         const utterance = new SpeechSynthesisUtterance(text);
 
-        // CRITICAL: Set Telugu language
-        utterance.lang = 'te-IN';
-
-        // Natural female voice settings
-        utterance.rate = 0.85;   // Slightly slower for clarity
-        utterance.pitch = 1.15;  // Slightly higher for female voice
-        utterance.volume = 1.0;
-
-        // Set the Telugu voice if available
-        if (teluguVoice) {
-          utterance.voice = teluguVoice;
-          console.log('Speaking with voice:', teluguVoice.name);
+        // Set language and voice based on language parameter
+        if (language === 'telugu') {
+          utterance.lang = 'te-IN';
+          if (voices.telugu) {
+            utterance.voice = voices.telugu;
+          }
         } else {
-          // Try to find voice one more time
-          const voices = window.speechSynthesis.getVoices();
-          const fallbackVoice = voices.find(v => {
-            const lang = (v.lang || '').toLowerCase();
-            const name = (v.name || '').toLowerCase();
-            return lang.startsWith('te') || name.includes('telugu') || name.includes('తెలుగు');
-          });
-
-          if (fallbackVoice) {
-            utterance.voice = fallbackVoice;
-            console.log('Speaking with fallback voice:', fallbackVoice.name);
-          } else {
-            console.error('WARNING: No Telugu voice found! Speech may be in English.');
-            // Still attempt with te-IN lang setting
+          utterance.lang = 'en-IN';
+          if (voices.english) {
+            utterance.voice = voices.english;
           }
         }
 
+        // Female voice settings
+        utterance.rate = 0.85;   // Slightly slower for clarity
+        utterance.pitch = 1.1;   // Slightly higher for female voice
+        utterance.volume = 1.0;
+
         utterance.onstart = () => {
           speakingRef.current = true;
-          console.log('Started speaking:', text.substring(0, 50) + '...');
+          console.log(`Started speaking (${language}):`, text.substring(0, 50) + '...');
         };
 
         utterance.onend = () => {
           speakingRef.current = false;
-          console.log('Finished speaking');
+          console.log(`Finished speaking (${language})`);
           resolve();
         };
 
@@ -223,58 +224,92 @@ export function useVoiceAnnouncement() {
         window.speechSynthesis.speak(utterance);
       }, 100);
     });
-  }, [teluguVoice]);
+  }, [voices]);
 
-  // Announce patient call - FULLY IN TELUGU
-  // Format: "టోకెన్ నెంబర్ X, [పేరు] గారు, రూమ్ నెంబర్ Y కి వెళ్లండి"
+  // Delay helper function
+  const delay = (ms: number): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  };
+
+  // Announce patient call - Bilingual (Telugu and English)
+  // Pattern: Telugu → English → Telugu → English (4 times total)
+  // Delay: 2-3 seconds between each announcement
   const announcePatientCall = useCallback(async (
-    tokenNumber: string,
+    opNumber: string,
     patientName: string,
     roomNumber: string = '1'
   ) => {
-    // Extract numeric part from token (e.g., "OP-5" -> "5")
-    const tokenNum = tokenNumber.replace(/\D/g, '') || tokenNumber;
+    // Telugu announcement text
+    const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి రూమ్ నెంబర్ ${roomNumber} కి వెళ్లండి.`;
 
-    // Fully Telugu announcement
-    const teluguText = `టోకెన్ నెంబర్ ${tokenNum}, ${patientName} గారు, రూమ్ నెంబర్ ${roomNumber} కి వెళ్లండి`;
+    // English announcement text
+    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to room number ${roomNumber}.`;
 
-    console.log('Announcing (Telugu):', teluguText);
+    console.log('Starting bilingual announcement...');
+    console.log('Telugu:', teluguText);
+    console.log('English:', englishText);
 
-    // First announcement
-    await speak(teluguText);
+    // Announcement cycle: Telugu → English → Telugu → English
+    // 1. First Telugu announcement
+    await speak(teluguText, 'telugu');
+    await delay(2500);
 
-    // Pause between announcements
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    // 2. First English announcement
+    await speak(englishText, 'english');
+    await delay(2500);
 
-    // Repeat announcement
-    await speak(teluguText);
+    // 3. Second Telugu announcement
+    await speak(teluguText, 'telugu');
+    await delay(2500);
 
+    // 4. Second English announcement
+    await speak(englishText, 'english');
+
+    console.log('Bilingual announcement completed.');
   }, [speak]);
 
-  // Announce lab call - FULLY IN TELUGU
-  const announceLabCall = useCallback(async (tokenNumber: string, patientName: string) => {
-    const tokenNum = tokenNumber.replace(/\D/g, '') || tokenNumber;
-    const teluguText = `ల్యాబ్ టోకెన్ నెంబర్ ${tokenNum}, ${patientName} గారు, ల్యాబ్ కి వెళ్లండి`;
+  // Announce lab call - Bilingual
+  const announceLabCall = useCallback(async (
+    opNumber: string,
+    patientName: string
+  ) => {
+    const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి ల్యాబ్ కి వెళ్లండి.`;
+    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to the lab.`;
 
-    console.log('Announcing Lab (Telugu):', teluguText);
+    console.log('Starting lab announcement...');
 
-    await speak(teluguText);
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    await speak(teluguText);
+    // Telugu → English → Telugu → English
+    await speak(teluguText, 'telugu');
+    await delay(2500);
+    await speak(englishText, 'english');
+    await delay(2500);
+    await speak(teluguText, 'telugu');
+    await delay(2500);
+    await speak(englishText, 'english');
 
+    console.log('Lab announcement completed.');
   }, [speak]);
 
-  // Announce pharmacy call - FULLY IN TELUGU
-  const announcePharmacyCall = useCallback(async (tokenNumber: string, patientName: string) => {
-    const tokenNum = tokenNumber.replace(/\D/g, '') || tokenNumber;
-    const teluguText = `ఫార్మసీ టోకెన్ నెంబర్ ${tokenNum}, ${patientName} గారు, ఫార్మసీ కి వెళ్లండి`;
+  // Announce pharmacy call - Bilingual
+  const announcePharmacyCall = useCallback(async (
+    opNumber: string,
+    patientName: string
+  ) => {
+    const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి ఫార్మసీ కి వెళ్లండి.`;
+    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to the pharmacy.`;
 
-    console.log('Announcing Pharmacy (Telugu):', teluguText);
+    console.log('Starting pharmacy announcement...');
 
-    await speak(teluguText);
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    await speak(teluguText);
+    // Telugu → English → Telugu → English
+    await speak(teluguText, 'telugu');
+    await delay(2500);
+    await speak(englishText, 'english');
+    await delay(2500);
+    await speak(teluguText, 'telugu');
+    await delay(2500);
+    await speak(englishText, 'english');
 
+    console.log('Pharmacy announcement completed.');
   }, [speak]);
 
   return {
@@ -283,7 +318,9 @@ export function useVoiceAnnouncement() {
     announceLabCall,
     announcePharmacyCall,
     isSpeaking: speakingRef.current,
-    teluguVoiceAvailable: !!teluguVoice,
-    teluguVoiceName: teluguVoice?.name || 'Not loaded',
+    teluguVoiceAvailable: !!voices.telugu,
+    englishVoiceAvailable: !!voices.english,
+    teluguVoiceName: voices.telugu?.name || 'Not loaded',
+    englishVoiceName: voices.english?.name || 'Not loaded',
   };
 }
