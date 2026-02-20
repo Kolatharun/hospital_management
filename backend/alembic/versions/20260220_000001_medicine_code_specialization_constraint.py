@@ -35,9 +35,32 @@ def upgrade() -> None:
         WHERE specialization IS NULL
     """)
 
-    # Drop the existing unique constraint on code alone
-    # PostgreSQL auto-creates index for unique columns, so we need to drop it
-    op.drop_constraint('medicine_master_code_key', 'medicine_master', type_='unique')
+    # Drop the existing unique constraint on code alone (if it exists)
+    # PostgreSQL auto-creates constraints/indexes for unique columns
+    # The constraint name may vary depending on how the table was created
+    # Using DO block to safely drop if exists
+    op.execute("""
+        DO $$
+        BEGIN
+            -- Try to drop the constraint if it exists
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'medicine_master_code_key'
+                AND conrelid = 'medicine_master'::regclass
+            ) THEN
+                ALTER TABLE medicine_master DROP CONSTRAINT medicine_master_code_key;
+            END IF;
+
+            -- Also try to drop the auto-generated unique index if it exists
+            IF EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE indexname = 'medicine_master_code_key'
+                AND tablename = 'medicine_master'
+            ) THEN
+                DROP INDEX medicine_master_code_key;
+            END IF;
+        END $$;
+    """)
 
     # Alter column to NOT NULL
     op.alter_column(
@@ -47,27 +70,47 @@ def upgrade() -> None:
         nullable=False
     )
 
-    # Add composite unique constraint on (code, specialization)
-    op.create_unique_constraint(
-        'uq_medicine_code_specialization',
-        'medicine_master',
-        ['code', 'specialization']
-    )
+    # Add composite unique constraint on (code, specialization) if not exists
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_medicine_code_specialization'
+                AND conrelid = 'medicine_master'::regclass
+            ) THEN
+                ALTER TABLE medicine_master
+                ADD CONSTRAINT uq_medicine_code_specialization UNIQUE (code, specialization);
+            END IF;
+        END $$;
+    """)
 
-    # Add composite index for (code, specialization) queries
-    op.create_index(
-        'ix_medicine_master_code_spec',
-        'medicine_master',
-        ['code', 'specialization']
-    )
+    # Add composite index for (code, specialization) queries if not exists
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_medicine_master_code_spec
+        ON medicine_master (code, specialization);
+    """)
 
 
 def downgrade() -> None:
-    # Drop the composite index
-    op.drop_index('ix_medicine_master_code_spec', table_name='medicine_master')
+    # Drop the composite index (if exists)
+    op.execute("""
+        DROP INDEX IF EXISTS ix_medicine_master_code_spec;
+    """)
 
-    # Drop the composite unique constraint
-    op.drop_constraint('uq_medicine_code_specialization', 'medicine_master', type_='unique')
+    # Drop the composite unique constraint (if exists)
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_medicine_code_specialization'
+                AND conrelid = 'medicine_master'::regclass
+            ) THEN
+                ALTER TABLE medicine_master DROP CONSTRAINT uq_medicine_code_specialization;
+            END IF;
+        END $$;
+    """)
 
     # Make specialization nullable again
     op.alter_column(
@@ -77,6 +120,17 @@ def downgrade() -> None:
         nullable=True
     )
 
-    # Re-add unique constraint on code alone
+    # Re-add unique constraint on code alone (if not exists)
     # Note: This may fail if there are now duplicate codes
-    op.create_unique_constraint('medicine_master_code_key', 'medicine_master', ['code'])
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'medicine_master_code_key'
+                AND conrelid = 'medicine_master'::regclass
+            ) THEN
+                ALTER TABLE medicine_master ADD CONSTRAINT medicine_master_code_key UNIQUE (code);
+            END IF;
+        END $$;
+    """)
