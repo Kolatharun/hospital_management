@@ -75,6 +75,66 @@ class MedicineMasterBulkCreate(BaseModel):
 
 
 # ============================================================
+# CSV Upload and Preview Schemas
+# ============================================================
+
+class CSVMedicineRow(BaseModel):
+    """Single row from parsed CSV."""
+
+    row_number: int = Field(..., description="Row number in CSV (1-indexed)")
+    code: str = Field(..., max_length=50, description="Medicine code")
+    category: str = Field(..., max_length=100, description="Category")
+    name: str = Field(..., max_length=255, description="Medicine name")
+    generic_name: Optional[str] = Field(None, max_length=255, description="Generic name")
+    dosage_form: Optional[str] = Field(None, max_length=50, description="Dosage form")
+    strength: Optional[str] = Field(None, max_length=50, description="Strength")
+    manufacturer: Optional[str] = Field(None, max_length=200, description="Manufacturer")
+    is_valid: bool = Field(default=True, description="Whether row passed validation")
+    error_message: Optional[str] = Field(None, description="Validation error if any")
+
+
+class CSVParseRequest(BaseModel):
+    """Request to parse CSV content."""
+
+    csv_content: str = Field(..., description="Raw CSV content as string")
+    specialization: str = Field(..., max_length=100, description="Specialization to assign")
+
+
+class CSVParseResponse(BaseModel):
+    """Response after parsing CSV (preview only, no DB insert)."""
+
+    success: bool = Field(..., description="Whether parsing was successful")
+    total_rows: int = Field(..., description="Total rows parsed")
+    valid_rows: int = Field(..., description="Number of valid rows")
+    invalid_rows: int = Field(..., description="Number of invalid rows")
+    preview: List[CSVMedicineRow] = Field(..., description="Parsed rows with validation status")
+    errors: List[str] = Field(default_factory=list, description="General parsing errors")
+
+
+class BulkSaveRequest(BaseModel):
+    """Request to save parsed medicines to database."""
+
+    specialization: str = Field(..., max_length=100, description="Specialization for all medicines")
+    medicines: List[MedicineMasterCreate] = Field(..., description="Medicines to insert")
+
+
+class BulkSaveResponse(BaseModel):
+    """Response after bulk save operation."""
+
+    success: bool = Field(..., description="Whether save was successful")
+    inserted: int = Field(default=0, description="Number of records inserted")
+    message: Optional[str] = Field(None, description="Success or error message")
+
+
+class ClearBySpecializationResponse(BaseModel):
+    """Response after clearing medicines by specialization."""
+
+    success: bool = Field(..., description="Whether clear was successful")
+    deleted: int = Field(default=0, description="Number of records deleted")
+    specialization: str = Field(..., description="Specialization that was cleared")
+
+
+# ============================================================
 # Admin User Management Schemas
 # ============================================================
 
@@ -107,6 +167,12 @@ class AdminUserStatusUpdate(BaseModel):
     """Schema for activating/deactivating user."""
 
     is_active: bool
+
+
+class PasswordResetRequest(BaseModel):
+    """Schema for resetting user password."""
+
+    new_password: str = Field(..., min_length=6, description="New password (min 6 characters)")
 
 
 # ============================================================

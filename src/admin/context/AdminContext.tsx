@@ -13,6 +13,10 @@ import {
   DoctorUpdate,
   UserCreate,
   MedicineCreate,
+  CSVParseResponse,
+  CSVMedicineRow,
+  BulkSaveResponse,
+  ClearBySpecializationResponse,
 } from '@/services/adminService';
 import { toast } from 'sonner';
 
@@ -119,7 +123,11 @@ interface AdminContextType {
   updateMedicine: (id: string, medicine: Partial<Medicine>) => Promise<void>;
   importMedicines: (medicines: Omit<Medicine, 'id' | 'isActive'>[]) => Promise<void>;
   deleteMedicine: (id: string) => Promise<void>;
-  clearMedicinesBySpecialization: (specialization: string) => void;
+  clearMedicinesBySpecialization: (specialization: string) => Promise<ClearBySpecializationResponse>;
+
+  // CSV Upload operations (preview flow)
+  parseCSV: (csvContent: string, specialization: string) => Promise<CSVParseResponse>;
+  bulkSaveMedicines: (medicines: Omit<Medicine, 'id' | 'isActive'>[], specialization: string) => Promise<BulkSaveResponse>;
 
   // Settings operations
   updateSettings: (settings: Partial<ClinicSettings>) => void;
@@ -433,9 +441,46 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     setMedicines(prev => prev.filter(m => m.id !== id));
   }, []);
 
-  const clearMedicinesBySpecialization = useCallback((specialization: string) => {
-    setMedicines(prev => prev.filter(m => m.specialization !== specialization));
+  const clearMedicinesBySpecialization = useCallback(async (specialization: string) => {
+    const result = await adminMedicineService.clearBySpecialization(specialization);
+    if (result.success) {
+      await fetchMedicines();
+    }
+    return result;
+  }, [fetchMedicines]);
+
+  // ============================================================
+  // CSV Upload Operations (Preview Flow)
+  // ============================================================
+
+  const parseCSV = useCallback(async (csvContent: string, specialization: string) => {
+    return await adminMedicineService.parseCSV(csvContent, specialization);
   }, []);
+
+  const bulkSaveMedicines = useCallback(async (
+    newMedicines: Omit<Medicine, 'id' | 'isActive'>[],
+    specialization: string
+  ) => {
+    const createData: MedicineCreate[] = newMedicines.map(m => ({
+      code: m.code,
+      name: m.name,
+      generic_name: m.genericName || undefined,
+      category: m.category || undefined,
+      specialization: specialization,
+      dosage_form: m.dosageForm || undefined,
+      strength: m.strength || undefined,
+      manufacturer: m.manufacturer || undefined,
+    }));
+
+    const result = await adminMedicineService.bulkSave(createData, specialization);
+
+    if (result.success) {
+      // Refresh medicines list after successful save
+      await fetchMedicines();
+    }
+
+    return result;
+  }, [fetchMedicines]);
 
   // ============================================================
   // Settings Operations (local storage for now)
@@ -507,6 +552,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         importMedicines,
         deleteMedicine,
         clearMedicinesBySpecialization,
+        parseCSV,
+        bulkSaveMedicines,
         updateSettings,
         getMedicinesBySpecialization,
         getSpecializations,

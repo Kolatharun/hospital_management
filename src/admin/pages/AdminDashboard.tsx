@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { LogOut, Settings, Users, Stethoscope, Pill, Building2 } from 'lucide-react';
+import logo from '@/assets/logo.jpeg';
 import { useAuth } from '@/contexts/AuthContext';
 import { SettingsManagement } from '@/admin/components/SettingsManagement';
 import { DoctorsManagement } from '@/admin/components/DoctorsManagement';
@@ -12,20 +13,30 @@ import { DepartmentsManagement } from '@/admin/components/DepartmentsManagement'
 type AdminTab = 'settings' | 'departments' | 'doctors' | 'staff' | 'medicines';
 
 const tabs: { id: AdminTab; label: string; icon: React.ElementType }[] = [
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'staff', label: 'Users', icon: Users },
   { id: 'departments', label: 'Departments', icon: Building2 },
   { id: 'doctors', label: 'Doctors', icon: Stethoscope },
-  { id: 'staff', label: 'Users', icon: Users },
   { id: 'medicines', label: 'Medicines', icon: Pill },
+  // TODO: Re-enable for Version 2
+  // { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminDashboard() {
   const { logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>('settings');
+  const [activeTab, setActiveTab] = useState<AdminTab>('staff');
 
   return (
     <PageContainer
-      title="Admin Portal"
+      title={
+        <div className="flex items-center gap-3">
+          <img
+            src={logo}
+            alt="Balaji Heart Center"
+            className="h-10"
+          />
+          <span>Admin Portal</span>
+        </div>
+      }
       actions={
         <Button variant="outline" onClick={logout} className="gap-2">
           <LogOut className="h-4 w-4" />

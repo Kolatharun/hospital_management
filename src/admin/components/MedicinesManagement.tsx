@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useAdmin, Medicine } from '@/admin/context/AdminContext';
-import { Plus, Upload, Trash2, Download, FileSpreadsheet, Filter, AlertTriangle, Pencil, Loader2 } from 'lucide-react';
+import { CSVMedicineRow } from '@/services/adminService';
+import { Plus, Trash2, Download, FileSpreadsheet, Filter, AlertTriangle, Pencil, Loader2, Save, X, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MedicineFormData {
@@ -40,9 +41,10 @@ export function MedicinesManagement() {
     fetchMedicines,
     addMedicine,
     updateMedicine,
-    importMedicines,
     deleteMedicine,
     clearMedicinesBySpecialization,
+    parseCSV,
+    bulkSaveMedicines,
     getSpecializations,
     getCategories
   } = useAdmin();
@@ -56,6 +58,13 @@ export function MedicinesManagement() {
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // CSV Preview State
+  const [csvPreview, setCsvPreview] = useState<CSVMedicineRow[]>([]);
+  const [csvParsing, setCsvParsing] = useState(false);
+  const [csvSaving, setCsvSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewStats, setPreviewStats] = useState({ total: 0, valid: 0, invalid: 0 });
 
   useEffect(() => {
     fetchMedicines();
@@ -129,17 +138,26 @@ export function MedicinesManagement() {
     }
   };
 
-  const handleClearSpecialization = () => {
+  const handleClearSpecialization = async () => {
     if (!importSpecialization) {
       toast.error('Please select a specialization first');
       return;
     }
     if (confirm(`Delete ALL entries for "${importSpecialization}"?`)) {
-      clearMedicinesBySpecialization(importSpecialization);
-      toast.success(`All ${importSpecialization} entries deleted`);
+      try {
+        const result = await clearMedicinesBySpecialization(importSpecialization);
+        if (result.success) {
+          toast.success(`Deleted ${result.deleted} ${importSpecialization} entries`);
+        } else {
+          toast.error('Failed to clear entries');
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to clear entries');
+      }
     }
   };
 
+  // Parse CSV and show preview - does NOT insert into database
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -148,41 +166,87 @@ export function MedicinesManagement() {
       return;
     }
 
+    setCsvParsing(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const text = event.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        const dataLines = lines.slice(1);
+        const csvContent = event.target?.result as string;
 
-        const newMedicines = dataLines.map(line => {
-          const cols = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
-          const [code, category, name, genericName, dosageForm, strength, manufacturer] = cols;
-          return {
-            code: code || '',
-            category: category || '',
-            name: name || '',
-            genericName: genericName || '',
-            specialization: importSpecialization,
-            dosageForm: dosageForm || 'Tablet',
-            strength: strength || '',
-            manufacturer: manufacturer || '',
-          };
-        }).filter(m => m.name);
+        // Call API to parse CSV - this does NOT insert into database
+        const result = await parseCSV(csvContent, importSpecialization);
 
-        if (newMedicines.length === 0) {
-          toast.error('No valid entries found in CSV');
+        if (!result.success) {
+          toast.error(result.errors.join(', ') || 'Failed to parse CSV');
+          setCsvParsing(false);
           return;
         }
 
-        await importMedicines(newMedicines);
-        toast.success(`${newMedicines.length} entries imported successfully`);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (result.preview.length === 0) {
+          toast.error('No entries found in CSV');
+          setCsvParsing(false);
+          return;
+        }
+
+        // Show preview - user must click Save to insert
+        setCsvPreview(result.preview);
+        setPreviewStats({
+          total: result.total_rows,
+          valid: result.valid_rows,
+          invalid: result.invalid_rows,
+        });
+        setShowPreview(true);
+        toast.info(`Parsed ${result.total_rows} rows. Review and click Save to import.`);
       } catch (error: any) {
         toast.error(error.message || 'Error parsing CSV file');
+      } finally {
+        setCsvParsing(false);
       }
     };
     reader.readAsText(file);
+  };
+
+  // Save parsed CSV data to database - only called when Save button is clicked
+  const handleSaveCSV = async () => {
+    const validRows = csvPreview.filter(row => row.is_valid);
+    if (validRows.length === 0) {
+      toast.error('No valid rows to save');
+      return;
+    }
+
+    setCsvSaving(true);
+    try {
+      const medicinesToSave = validRows.map(row => ({
+        code: row.code,
+        name: row.name,
+        genericName: row.generic_name || '',
+        category: row.category,
+        specialization: importSpecialization,
+        dosageForm: row.dosage_form || 'Tablet',
+        strength: row.strength || '',
+        manufacturer: row.manufacturer || '',
+      }));
+
+      const result = await bulkSaveMedicines(medicinesToSave, importSpecialization);
+
+      if (result.success) {
+        toast.success(`Successfully imported ${result.inserted} medicines`);
+        handleCancelPreview();
+      } else {
+        toast.error(result.message || 'Failed to save medicines');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save medicines');
+    } finally {
+      setCsvSaving(false);
+    }
+  };
+
+  // Cancel preview and reset state
+  const handleCancelPreview = () => {
+    setCsvPreview([]);
+    setShowPreview(false);
+    setPreviewStats({ total: 0, valid: 0, invalid: 0 });
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const downloadSampleCSV = () => {
@@ -226,6 +290,7 @@ D004,Heart Failure,Metoprolol,Metoprolol Tartrate,Tablet,50mg,AstraZeneca`;
                 onChange={(e) => setImportSpecialization(e.target.value)}
                 list="spec-list"
                 className="mt-1"
+                disabled={showPreview}
               />
               <datalist id="spec-list">
                 {specializations.map(s => <option key={s} value={s} />)}
@@ -233,23 +298,122 @@ D004,Heart Failure,Metoprolol,Metoprolol Tartrate,Tablet,50mg,AstraZeneca`;
             </div>
             <div>
               <Label>Upload CSV File</Label>
-              <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="mt-1" />
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="mt-1"
+                disabled={csvParsing || showPreview}
+              />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={downloadSampleCSV} className="gap-2 flex-1">
+              <Button variant="outline" onClick={downloadSampleCSV} className="gap-2 flex-1" disabled={showPreview}>
                 <Download className="h-4 w-4" />
                 Sample CSV
               </Button>
-              <Button variant="destructive" onClick={handleClearSpecialization} disabled={!importSpecialization} className="gap-2 flex-1">
+              <Button variant="destructive" onClick={handleClearSpecialization} disabled={!importSpecialization || showPreview} className="gap-2 flex-1">
                 <Trash2 className="h-4 w-4" />
                 Clear All
               </Button>
             </div>
           </div>
-          <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg text-muted-foreground text-sm">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>Importing will <strong>add</strong> to existing entries. Use "Clear All" first if you want to replace data for a specialization.</span>
-          </div>
+
+          {/* CSV Parsing Indicator */}
+          {csvParsing && (
+            <div className="flex items-center justify-center py-8 bg-muted/30 rounded-lg">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+              <span>Parsing CSV file...</span>
+            </div>
+          )}
+
+          {/* CSV Preview Section */}
+          {showPreview && (
+            <div className="space-y-4 border border-primary/30 rounded-lg p-4 bg-primary/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <h3 className="font-semibold text-lg">CSV Preview</h3>
+                  <div className="flex gap-2 text-sm">
+                    <Badge variant="outline">{previewStats.total} Total</Badge>
+                    <Badge variant="default" className="bg-green-600">{previewStats.valid} Valid</Badge>
+                    {previewStats.invalid > 0 && (
+                      <Badge variant="destructive">{previewStats.invalid} Invalid</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCancelPreview} disabled={csvSaving}>
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveCSV} disabled={csvSaving || previewStats.valid === 0}>
+                    {csvSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-1" />
+                    )}
+                    Save {previewStats.valid} Entries
+                  </Button>
+                </div>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-12">Row</TableHead>
+                      <TableHead className="w-12">Status</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Generic Name</TableHead>
+                      <TableHead>Form</TableHead>
+                      <TableHead>Strength</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {csvPreview.map((row) => (
+                      <TableRow
+                        key={row.row_number}
+                        className={row.is_valid ? '' : 'bg-destructive/10'}
+                      >
+                        <TableCell className="text-xs text-muted-foreground">{row.row_number}</TableCell>
+                        <TableCell>
+                          {row.is_valid ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{row.code || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.category || '-'}</TableCell>
+                        <TableCell className="font-medium">{row.name || '-'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{row.generic_name || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.dosage_form || '-'}</TableCell>
+                        <TableCell className="text-sm">{row.strength || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {previewStats.invalid > 0 && (
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />
+                  <span><strong>{previewStats.invalid}</strong> rows have errors and will be skipped. Only valid rows will be saved.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!showPreview && (
+            <div className="flex items-start gap-2 p-3 bg-muted border border-border rounded-lg text-muted-foreground text-sm">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>CSV will be parsed for <strong>preview only</strong>. You must click <strong>Save</strong> to import data. Use "Clear All" first if you want to replace existing data.</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -257,7 +421,7 @@ D004,Heart Failure,Metoprolol,Metoprolol Tartrate,Tablet,50mg,AstraZeneca`;
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
-            <CardTitle className="text-xl">Medicines & Diagnoses</CardTitle>
+            <CardTitle className="text-xl">Medicines</CardTitle>
             <CardDescription>{filteredMedicines.length} entries found</CardDescription>
           </div>
           <Button onClick={handleAdd} className="gap-2">

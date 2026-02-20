@@ -33,12 +33,19 @@ from app.schemas.admin import (
     AdminUserResponse,
     AdminUserListResponse,
     AdminUserStatusUpdate,
+    PasswordResetRequest,
     AdminDoctorResponse,
     AdminDoctorListResponse,
     AdminDepartmentResponse,
     AdminDepartmentListResponse,
     AdminDepartmentCreate,
     AdminDepartmentUpdate,
+    CSVMedicineRow,
+    CSVParseRequest,
+    CSVParseResponse,
+    BulkSaveRequest,
+    BulkSaveResponse,
+    ClearBySpecializationResponse,
 )
 from app.schemas.auth import UserCreate, UserUpdate
 from app.schemas.department import DoctorCreate, DoctorUpdate
@@ -254,6 +261,37 @@ async def toggle_user_status(
     db.refresh(user)
 
     return AdminUserResponse.model_validate(user)
+
+
+@router.put(
+    "/users/{user_id}/reset-password",
+    response_model=MessageResponse,
+    summary="Reset user password",
+    description="Reset a user's password. Admin only.",
+)
+async def reset_user_password(
+    user_id: UUID,
+    password_data: PasswordResetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+) -> MessageResponse:
+    """Reset a user's password."""
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.is_deleted == False,
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Hash and update password
+    user.password_hash = get_password_hash(password_data.new_password)
+    db.commit()
+
+    return MessageResponse(message="Password reset successfully")
 
 
 @router.delete(
@@ -840,7 +878,7 @@ async def delete_department(
 )
 async def list_medicines(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by name, code, or generic name"),
     category: Optional[str] = Query(None, description="Filter by category"),
     specialization: Optional[str] = Query(None, description="Filter by specialization"),
@@ -899,16 +937,17 @@ async def create_medicine(
     current_user: User = Depends(get_admin_user),
 ) -> MedicineMasterResponse:
     """Create a new medicine."""
-    # Check if code exists
+    # Check if code + specialization combination exists (unique constraint)
     existing = db.query(MedicineMaster).filter(
         MedicineMaster.code == medicine_data.code,
+        MedicineMaster.specialization == medicine_data.specialization,
         MedicineMaster.is_deleted == False,
     ).first()
 
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Medicine code already exists",
+            detail=f"Medicine code '{medicine_data.code}' already exists for specialization '{medicine_data.specialization}'",
         )
 
     # Create medicine
@@ -979,6 +1018,48 @@ async def bulk_import_medicines(
     return MessageResponse(
         message=f"Imported {imported} medicines, skipped {skipped} duplicates"
     )
+
+
+@router.delete(
+    "/medicines/clear",
+    response_model=ClearBySpecializationResponse,
+    summary="Clear medicines by specialization",
+    description="Hard delete all medicines for a specific specialization. Admin only.",
+)
+async def clear_medicines_by_specialization(
+    specialization: str = Query(..., description="Specialization to clear"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+) -> ClearBySpecializationResponse:
+    """
+    Hard delete all medicines for a given specialization.
+    Case-insensitive comparison with whitespace trimming.
+    """
+    if not specialization:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Specialization is required",
+        )
+
+    try:
+        deleted_count = db.query(MedicineMaster).filter(
+            func.lower(func.trim(MedicineMaster.specialization)) == specialization.strip().lower(),
+        ).delete(synchronize_session=False)
+
+        db.commit()
+
+        return ClearBySpecializationResponse(
+            success=True,
+            deleted=deleted_count,
+            specialization=specialization,
+        )
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear medicines: {str(e)}",
+        )
 
 
 @router.get(
@@ -1148,3 +1229,219 @@ async def get_specializations(
     ).distinct().all()
 
     return [s[0] for s in specializations if s[0]]
+
+
+# ============================================================
+# CSV Upload and Bulk Operations
+# ============================================================
+
+@router.post(
+    "/medicines/csv/parse",
+    response_model=CSVParseResponse,
+    summary="Parse CSV for preview",
+    description="Parse CSV content and return preview. Does NOT insert into database.",
+)
+async def parse_csv_medicines(
+    request: CSVParseRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+) -> CSVParseResponse:
+    """
+    Parse CSV content and return preview with validation.
+    This does NOT insert any data into the database.
+
+    Expected CSV columns: Code, Category, Name, Generic Name, Dosage Form, Strength, Manufacturer
+    """
+    import csv
+    import io
+
+    preview_rows: list[CSVMedicineRow] = []
+    errors: list[str] = []
+    valid_count = 0
+    invalid_count = 0
+
+    try:
+        # Parse CSV content
+        csv_file = io.StringIO(request.csv_content)
+        reader = csv.DictReader(csv_file)
+
+        # Validate headers
+        required_headers = {"Code", "Category", "Name"}
+        if reader.fieldnames:
+            headers_set = set(reader.fieldnames)
+            missing = required_headers - headers_set
+            if missing:
+                errors.append(f"Missing required columns: {', '.join(missing)}")
+                return CSVParseResponse(
+                    success=False,
+                    total_rows=0,
+                    valid_rows=0,
+                    invalid_rows=0,
+                    preview=[],
+                    errors=errors,
+                )
+
+        # Get existing codes for this specialization to check duplicates
+        existing_codes = set(
+            code[0] for code in db.query(MedicineMaster.code).filter(
+                MedicineMaster.specialization == request.specialization,
+                MedicineMaster.is_deleted == False,
+            ).all()
+        )
+
+        # Track codes in current batch to detect duplicates within CSV
+        batch_codes: set[str] = set()
+
+        for row_num, row in enumerate(reader, start=2):  # Start at 2 (1-indexed, after header)
+            code = (row.get("Code") or "").strip()
+            category = (row.get("Category") or "").strip()
+            name = (row.get("Name") or "").strip()
+            generic_name = (row.get("Generic Name") or "").strip()
+            dosage_form = (row.get("Dosage Form") or "Tablet").strip()
+            strength = (row.get("Strength") or "").strip()
+            manufacturer = (row.get("Manufacturer") or "").strip()
+
+            # Validation
+            is_valid = True
+            error_message = None
+
+            if not name:
+                is_valid = False
+                error_message = "Name is required"
+            elif not code:
+                is_valid = False
+                error_message = "Code is required"
+            elif code in existing_codes:
+                is_valid = False
+                error_message = f"Code '{code}' already exists for {request.specialization}"
+            elif code in batch_codes:
+                is_valid = False
+                error_message = f"Duplicate code '{code}' in CSV"
+
+            if is_valid:
+                valid_count += 1
+                batch_codes.add(code)
+            else:
+                invalid_count += 1
+
+            preview_rows.append(CSVMedicineRow(
+                row_number=row_num,
+                code=code,
+                category=category,
+                name=name,
+                generic_name=generic_name or None,
+                dosage_form=dosage_form or None,
+                strength=strength or None,
+                manufacturer=manufacturer or None,
+                is_valid=is_valid,
+                error_message=error_message,
+            ))
+
+        return CSVParseResponse(
+            success=True,
+            total_rows=len(preview_rows),
+            valid_rows=valid_count,
+            invalid_rows=invalid_count,
+            preview=preview_rows,
+            errors=errors,
+        )
+
+    except Exception as e:
+        errors.append(f"Failed to parse CSV: {str(e)}")
+        return CSVParseResponse(
+            success=False,
+            total_rows=0,
+            valid_rows=0,
+            invalid_rows=0,
+            preview=[],
+            errors=errors,
+        )
+
+
+@router.post(
+    "/medicines/csv/save",
+    response_model=BulkSaveResponse,
+    summary="Bulk save parsed medicines",
+    description="Insert parsed medicines into database. Uses transaction - all or nothing.",
+)
+async def bulk_save_medicines(
+    request: BulkSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+) -> BulkSaveResponse:
+    """
+    Bulk insert medicines with transaction.
+    If any row fails, the entire transaction is rolled back.
+    """
+    if not request.medicines:
+        return BulkSaveResponse(
+            success=False,
+            inserted=0,
+            message="No medicines to insert",
+        )
+
+    try:
+        # Check for duplicates before inserting
+        codes_to_insert = [m.code for m in request.medicines]
+
+        existing = db.query(MedicineMaster.code).filter(
+            MedicineMaster.code.in_(codes_to_insert),
+            MedicineMaster.specialization == request.specialization,
+            MedicineMaster.is_deleted == False,
+        ).all()
+
+        if existing:
+            existing_codes = [e[0] for e in existing]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate codes found: {', '.join(existing_codes)}",
+            )
+
+        # Check for duplicates within the request
+        seen_codes: set[str] = set()
+        for med in request.medicines:
+            if med.code in seen_codes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate code in request: {med.code}",
+                )
+            seen_codes.add(med.code)
+
+        # Create all medicine records
+        medicines_to_add = []
+        for med_data in request.medicines:
+            medicine = MedicineMaster(
+                code=med_data.code,
+                name=med_data.name,
+                generic_name=med_data.generic_name,
+                category=med_data.category,
+                specialization=request.specialization,
+                dosage_form=med_data.dosage_form,
+                strength=med_data.strength,
+                manufacturer=med_data.manufacturer,
+                is_active=True,
+            )
+            medicines_to_add.append(medicine)
+
+        # Bulk insert with transaction
+        db.add_all(medicines_to_add)
+        db.commit()
+
+        return BulkSaveResponse(
+            success=True,
+            inserted=len(medicines_to_add),
+            message=f"Successfully inserted {len(medicines_to_add)} medicines",
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        return BulkSaveResponse(
+            success=False,
+            inserted=0,
+            message=f"Transaction failed and rolled back: {str(e)}",
+        )
+
+

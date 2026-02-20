@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 
 interface PageContainerProps {
-  title: string;
+  title: ReactNode;
   description?: string;
   children: ReactNode;
   actions?: ReactNode;

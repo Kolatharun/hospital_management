@@ -4,7 +4,7 @@ Medicine Master Model - Medicine Inventory Management
 Stores master data for medicines used in prescriptions.
 """
 
-from sqlalchemy import Column, String, Boolean, Index
+from sqlalchemy import Column, String, Boolean, Index, UniqueConstraint
 
 from app.models.base import BaseModel
 
@@ -13,6 +13,9 @@ class MedicineMaster(BaseModel):
     """
     Master data for medicines.
     Used by admin module for medicine management.
+
+    Unique constraint: (code, specialization) - same code can exist
+    in different specializations but not within the same one.
     """
 
     __tablename__ = "medicine_master"
@@ -20,9 +23,8 @@ class MedicineMaster(BaseModel):
     code = Column(
         String(50),
         nullable=False,
-        unique=True,
         index=True,
-        comment="Unique medicine code",
+        comment="Medicine code (unique per specialization)",
     )
 
     name = Column(
@@ -47,7 +49,7 @@ class MedicineMaster(BaseModel):
 
     specialization = Column(
         String(100),
-        nullable=True,
+        nullable=False,
         index=True,
         comment="Medical specialization (e.g., Cardiology)",
     )
@@ -78,11 +80,14 @@ class MedicineMaster(BaseModel):
         comment="Whether medicine is currently available",
     )
 
-    # Composite indexes for common queries
+    # Composite indexes and constraints
     __table_args__ = (
+        # Unique constraint: code + specialization must be unique
+        UniqueConstraint("code", "specialization", name="uq_medicine_code_specialization"),
         Index("ix_medicine_master_name_active", "name", "is_active"),
         Index("ix_medicine_master_category_spec", "category", "specialization"),
+        Index("ix_medicine_master_code_spec", "code", "specialization"),
     )
 
     def __repr__(self) -> str:
-        return f"<MedicineMaster(code={self.code}, name={self.name})>"
+        return f"<MedicineMaster(code={self.code}, name={self.name}, spec={self.specialization})>"

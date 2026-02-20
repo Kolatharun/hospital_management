@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin, Staff } from '@/admin/context/AdminContext';
-import { Plus, Pencil, Trash2, Users, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { adminUserService } from '@/services/adminService';
+import { Plus, Pencil, Trash2, Users, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface StaffFormData {
@@ -50,6 +51,12 @@ export function StaffManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Password reset state
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
+
   useEffect(() => {
     fetchStaff();
   }, [fetchStaff]);
@@ -72,6 +79,9 @@ export function StaffManagement() {
       isActive: member.isActive,
     });
     setShowPassword(false);
+    setShowResetPassword(false);
+    setNewPassword('');
+    setConfirmPassword('');
     setIsDialogOpen(true);
   };
 
@@ -128,6 +138,33 @@ export function StaffManagement() {
       } catch (error: any) {
         toast.error(error.message || 'Failed to delete staff member');
       }
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!editingStaff) return;
+
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      await adminUserService.resetPassword(editingStaff.id, newPassword);
+      toast.success('Password reset successfully');
+      setShowResetPassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reset password');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -301,6 +338,71 @@ export function StaffManagement() {
               />
               <Label>Active Account</Label>
             </div>
+
+            {/* Password Reset Section - Only shown when editing */}
+            {editingStaff && (
+              <div className="border-t pt-4 mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setShowResetPassword(!showResetPassword)}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Reset Password
+                </Button>
+
+                {showResetPassword && (
+                  <div className="mt-4 space-y-3 p-3 bg-muted/50 rounded-lg">
+                    <div>
+                      <Label>New Password *</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Confirm Password *</Label>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter password"
+                        className="mt-1"
+                      />
+                      {confirmPassword && newPassword !== confirmPassword && (
+                        <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleResetPassword}
+                      disabled={resettingPassword || !newPassword || !confirmPassword}
+                      className="w-full"
+                    >
+                      {resettingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Confirm Password Reset
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={submitting}>

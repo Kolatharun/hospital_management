@@ -141,6 +141,41 @@ export interface MedicineUpdate {
   is_active?: boolean;
 }
 
+// CSV Upload Types
+export interface CSVMedicineRow {
+  row_number: number;
+  code: string;
+  category: string;
+  name: string;
+  generic_name: string | null;
+  dosage_form: string | null;
+  strength: string | null;
+  manufacturer: string | null;
+  is_valid: boolean;
+  error_message: string | null;
+}
+
+export interface CSVParseResponse {
+  success: boolean;
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  preview: CSVMedicineRow[];
+  errors: string[];
+}
+
+export interface BulkSaveResponse {
+  success: boolean;
+  inserted: number;
+  message: string | null;
+}
+
+export interface ClearBySpecializationResponse {
+  success: boolean;
+  deleted: number;
+  specialization: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
@@ -272,6 +307,10 @@ export const adminUserService = {
   async getUnlinkedDoctorUsers(): Promise<User[]> {
     return api.get<User[]>('/admin/users/unlinked-doctors');
   },
+
+  async resetPassword(id: string, newPassword: string): Promise<MessageResponse> {
+    return api.put<MessageResponse>(`/admin/users/${id}/reset-password`, { new_password: newPassword });
+  },
 };
 
 // ============================================================
@@ -330,6 +369,38 @@ export const adminMedicineService = {
 
   async getSpecializations(): Promise<string[]> {
     return api.get<string[]>('/admin/master/specializations');
+  },
+
+  /**
+   * Parse CSV content and return preview without inserting to database.
+   * Frontend should display this preview and only call bulkSave when user clicks Save.
+   */
+  async parseCSV(csvContent: string, specialization: string): Promise<CSVParseResponse> {
+    return api.post<CSVParseResponse>('/admin/medicines/csv/parse', {
+      csv_content: csvContent,
+      specialization,
+    });
+  },
+
+  /**
+   * Bulk save parsed medicines to database with transaction.
+   * If any row fails, entire transaction is rolled back.
+   */
+  async bulkSave(medicines: MedicineCreate[], specialization: string): Promise<BulkSaveResponse> {
+    return api.post<BulkSaveResponse>('/admin/medicines/csv/save', {
+      medicines,
+      specialization,
+    });
+  },
+
+  /**
+   * Clear all medicines for a specific specialization.
+   * Uses soft delete for data integrity.
+   */
+  async clearBySpecialization(specialization: string): Promise<ClearBySpecializationResponse> {
+    return api.delete<ClearBySpecializationResponse>(
+      `/admin/medicines/clear?specialization=${encodeURIComponent(specialization)}`
+    );
   },
 };
 
