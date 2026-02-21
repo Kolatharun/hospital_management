@@ -71,6 +71,39 @@ class UserRepository(BaseRepository[User]):
             User.is_deleted == False,
         ).first()
 
+    def get_by_username_or_email(
+        self,
+        username_or_email: str,
+        include_inactive: bool = False,
+    ) -> Optional[User]:
+        """
+        Get user by username or email.
+
+        If input contains @, lookup by email. Otherwise lookup by username.
+
+        Args:
+            username_or_email: Username or email address
+            include_inactive: Whether to include inactive accounts
+
+        Returns:
+            User if found, None otherwise
+        """
+        if "@" in username_or_email:
+            query = self.db.query(User).filter(
+                User.email == username_or_email,
+                User.is_deleted == False,
+            )
+        else:
+            query = self.db.query(User).filter(
+                User.username == username_or_email,
+                User.is_deleted == False,
+            )
+
+        if not include_inactive:
+            query = query.filter(User.is_active == True)
+
+        return query.first()
+
     def get_by_role(
         self,
         role: UserRole,

@@ -61,7 +61,7 @@ class AuthService:
         login_data: LoginRequest,
     ) -> LoginResponse:
         """
-        Authenticate user with username and password.
+        Authenticate user with username/email and password.
 
         Maps to frontend: LoginPage.tsx form submission
 
@@ -74,8 +74,8 @@ class AuthService:
         Raises:
             HTTPException 401: If credentials are invalid
         """
-        # Find user by username
-        user = self.user_repo.get_by_username(login_data.username)
+        # Find user by username or email (@ indicates email)
+        user = self.user_repo.get_by_username_or_email(login_data.username_or_email)
 
         if user is None:
             raise HTTPException(

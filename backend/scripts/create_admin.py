@@ -14,7 +14,6 @@ Prerequisites:
 """
 
 import sys
-import getpass
 from pathlib import Path
 
 # Add backend to path
@@ -25,6 +24,32 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, check_db_connection
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
+
+
+def get_password_input(prompt: str) -> str:
+    """Get password input with Windows terminal support."""
+    if sys.platform == "win32":
+        import msvcrt
+        print(prompt, end="", flush=True)
+        password = []
+        while True:
+            char = msvcrt.getwch()
+            if char in ('\r', '\n'):
+                print()
+                break
+            elif char == '\x03':
+                raise KeyboardInterrupt
+            elif char == '\x08':
+                if password:
+                    password.pop()
+                    print('\b \b', end="", flush=True)
+            else:
+                password.append(char)
+                print('*', end="", flush=True)
+        return ''.join(password)
+    else:
+        import getpass
+        return getpass.getpass(prompt)
 
 
 def create_admin_user() -> None:
@@ -42,19 +67,29 @@ def create_admin_user() -> None:
 
     db = SessionLocal()
     try:
+        # Check if admin already exists - only ONE admin allowed
+        existing_admin = db.query(User).filter(
+            User.role == UserRole.ADMIN,
+            User.is_deleted == False
+        ).first()
+        if existing_admin:
+            print("Error: Admin user already exists. Only one admin is allowed.")
+            print(f"Existing admin username: {existing_admin.username}")
+            sys.exit(1)
+
         # Get username
         while True:
             username = input("Enter admin username: ").strip()
             if not username:
-                print("Username cannot be empty.")
+                print("Error: Username cannot be empty.")
                 continue
             if len(username) < 3:
-                print("Username must be at least 3 characters.")
+                print("Error: Username must be at least 3 characters.")
                 continue
             # Check if username exists
             existing = db.query(User).filter(User.username == username).first()
             if existing:
-                print(f"Username '{username}' already exists. Choose another.")
+                print(f"Error: Username '{username}' already exists. Choose another.")
                 continue
             break
 
@@ -68,18 +103,21 @@ def create_admin_user() -> None:
         if email:
             existing_email = db.query(User).filter(User.email == email).first()
             if existing_email:
-                print(f"Email '{email}' already exists. Skipping email.")
+                print(f"Warning: Email '{email}' already exists. Skipping email.")
                 email = None
 
-        # Get password
+        # Get password with Windows support
         while True:
-            password = getpass.getpass("Enter password: ")
-            if len(password) < 6:
-                print("Password must be at least 6 characters.")
+            password = get_password_input("Enter password: ")
+            if not password:
+                print("Error: Password cannot be empty.")
                 continue
-            password_confirm = getpass.getpass("Confirm password: ")
+            if len(password) < 6:
+                print("Error: Password must be at least 6 characters.")
+                continue
+            password_confirm = get_password_input("Confirm password: ")
             if password != password_confirm:
-                print("Passwords do not match. Try again.")
+                print("Error: Passwords do not match. Try again.")
                 continue
             break
 

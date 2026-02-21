@@ -22,16 +22,16 @@ class LoginRequest(BaseModel):
     Login request matching frontend LoginPage.tsx form.
 
     Frontend sends:
-    - username: string (required)
+    - username_or_email: string (required) - can be username or email
     - password: string (required)
     """
 
-    username: str = Field(
+    username_or_email: str = Field(
         ...,
         min_length=3,
-        max_length=100,
-        description="Username for authentication",
-        examples=["frontoffice", "doctor"],
+        max_length=255,
+        description="Username or email for authentication",
+        examples=["frontoffice", "user@example.com"],
     )
 
     password: str = Field(
@@ -44,7 +44,7 @@ class LoginRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "username": "frontoffice",
+                "username_or_email": "frontoffice",
                 "password": "front123",
             }
         }

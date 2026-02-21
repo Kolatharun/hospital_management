@@ -38,6 +38,7 @@ from app.controllers.doctor_controller import router as doctor_router
 from app.controllers.document_controller import router as document_router
 from app.controllers.master_data_controller import router as master_router
 from app.controllers.admin_controller import router as admin_router
+from app.controllers.tts_controller import router as tts_router
 from app.schemas.common import HealthCheckResponse, ErrorResponse
 
 
@@ -236,6 +237,9 @@ app.include_router(master_router, prefix=settings.API_V1_PREFIX)
 
 # Admin Module
 app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
+
+# TTS Module
+app.include_router(tts_router, prefix=settings.API_V1_PREFIX)
 
 
 # ============================================================

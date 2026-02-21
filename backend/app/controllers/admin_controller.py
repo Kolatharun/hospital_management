@@ -131,7 +131,7 @@ async def create_user(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists",
+            detail={"field": "username", "message": "Username already exists"},
         )
 
     # Check if email exists (if provided)
@@ -144,7 +144,7 @@ async def create_user(
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already exists",
+                detail={"field": "email", "message": "Email already exists"},
             )
 
     # Create user
@@ -483,7 +483,31 @@ async def create_doctor(
         if existing_link:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User is already linked to doctor: {existing_link.name}",
+                detail={"field": "user_id", "message": f"User is already linked to doctor: {existing_link.name}"},
+            )
+
+    # Check if registration number already exists
+    if doctor_data.registration_number:
+        existing_reg = db.query(Doctor).filter(
+            Doctor.registration_number == doctor_data.registration_number,
+            Doctor.is_deleted == False,
+        ).first()
+        if existing_reg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"field": "registration_number", "message": "Registration number already exists"},
+            )
+
+    # Check if email already exists
+    if doctor_data.email:
+        existing_email = db.query(Doctor).filter(
+            Doctor.email == doctor_data.email,
+            Doctor.is_deleted == False,
+        ).first()
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"field": "email", "message": "Email already exists"},
             )
 
     # Create doctor
@@ -574,8 +598,34 @@ async def update_doctor(
             if existing_link:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"User is already linked to doctor: {existing_link.name}",
+                    detail={"field": "user_id", "message": f"User is already linked to doctor: {existing_link.name}"},
                 )
+
+    # Check if registration number already exists (excluding current doctor)
+    if doctor_data.registration_number is not None and doctor_data.registration_number:
+        existing_reg = db.query(Doctor).filter(
+            Doctor.registration_number == doctor_data.registration_number,
+            Doctor.id != doctor_id,
+            Doctor.is_deleted == False,
+        ).first()
+        if existing_reg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"field": "registration_number", "message": "Registration number already exists"},
+            )
+
+    # Check if email already exists (excluding current doctor)
+    if doctor_data.email is not None and doctor_data.email:
+        existing_email = db.query(Doctor).filter(
+            Doctor.email == doctor_data.email,
+            Doctor.id != doctor_id,
+            Doctor.is_deleted == False,
+        ).first()
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"field": "email", "message": "Email already exists"},
+            )
 
     # Update fields
     update_data = doctor_data.model_dump(exclude_unset=True)
@@ -710,8 +760,8 @@ async def create_department(
 
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department code already exists",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"field": "code", "message": "Department code already exists"},
         )
 
     # Check if name exists
@@ -722,8 +772,8 @@ async def create_department(
 
     if existing_name:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department name already exists",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"field": "name", "message": "Department name already exists"},
         )
 
     department = Department(
