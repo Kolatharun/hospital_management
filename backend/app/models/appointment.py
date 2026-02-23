@@ -28,7 +28,7 @@ import enum
 from datetime import date, time, datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Column, String, Date, Time, Integer, Enum, ForeignKey, Index, event
+from sqlalchemy import Column, String, Date, Time, Integer, Enum, ForeignKey, Index, event, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -162,6 +162,12 @@ class Appointment(BaseModel):
         comment="Extra buffer time added to this patient's consultation slot",
     )
 
+    eta_started_at = Column(
+        String(50),
+        nullable=True,
+        comment="Timestamp when ETA calculation was last performed (ISO format)",
+    )
+
     # Timestamps for status changes
     called_at = Column(
         String(50),  # Using string to store ISO timestamp
@@ -173,6 +179,20 @@ class Appointment(BaseModel):
         String(50),
         nullable=True,
         comment="When consultation completed",
+    )
+
+    # Announcement tracking (for TV display)
+    announcement_played = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Whether the TV announcement has been played for this patient",
+    )
+
+    announcement_played_at = Column(
+        String(50),
+        nullable=True,
+        comment="When the announcement was played (ISO format)",
     )
 
     # Additional notes

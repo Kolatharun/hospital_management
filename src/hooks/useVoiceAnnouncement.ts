@@ -69,11 +69,11 @@ export function useVoiceAnnouncement() {
     opNumber: string,
     patientName: string,
     roomNumber: string = '1'
-  ): Promise<void> => {
-    // Prevent concurrent announcements
+  ): Promise<boolean> => {
+    // Prevent concurrent announcements - REJECT so caller knows voice didn't play
     if (isAnnouncingRef.current) {
       console.log('[TTS] Announcement already in progress, skipping...');
-      return;
+      throw new Error('ANNOUNCEMENT_SKIPPED');
     }
 
     isAnnouncingRef.current = true;
@@ -90,9 +90,11 @@ export function useVoiceAnnouncement() {
       await speak(teluguText, 'telugu');
       await delay(2500);
       await speak(englishText, 'english');
-      console.log('[TTS] Announcement completed');
+      console.log('[TTS] Announcement completed successfully');
+      return true;  // Voice actually played
     } catch (error) {
       console.error('[TTS] Announcement error:', error);
+      throw error;  // Re-throw so caller knows voice failed
     } finally {
       isAnnouncingRef.current = false;
     }

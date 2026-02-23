@@ -65,8 +65,12 @@ class AppointmentResponse(BaseModel):
     queue_type: str
     room: Optional[str] = None
     waiting_time_minutes: Optional[int] = None
+    buffer_time_minutes: Optional[int] = None
+    eta_started_at: Optional[str] = None
     called_at: Optional[str] = None
     completed_at: Optional[str] = None
+    announcement_played: bool = False
+    announcement_played_at: Optional[str] = None
     notes: Optional[str] = None
     created_at: str
 

@@ -16,8 +16,12 @@ export interface Appointment {
   queue_type: string;
   room?: string;
   waiting_time_minutes?: number;
+  buffer_time_minutes?: number;
+  eta_started_at?: string;
   called_at?: string;
   completed_at?: string;
+  announcement_played?: boolean;
+  announcement_played_at?: string;
   notes?: string;
   created_at: string;
   patient_name?: string;
@@ -125,6 +129,10 @@ export const appointmentService = {
 
   async addBufferTime(appointmentId: string, minutes: number): Promise<Appointment> {
     return api.post<Appointment>(`/appointments/${appointmentId}/buffer?minutes=${minutes}`);
+  },
+
+  async markAnnouncementPlayed(appointmentId: string): Promise<Appointment> {
+    return api.post<Appointment>(`/appointments/${appointmentId}/mark-announced`);
   },
 };
 

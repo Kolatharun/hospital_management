@@ -60,6 +60,14 @@ class AppointmentService:
         # Use doctor's room if no room explicitly provided
         room = data.room if data.room else (doctor.room if doctor else None)
 
+        # Calculate initial waiting_time based on last waiting patient
+        initial_waiting_time = 0
+        if data.doctor_id:
+            initial_waiting_time = self.appointment_repo.calculate_initial_waiting_time(
+                doctor_id=data.doctor_id,
+                appointment_date=data.appointment_date,
+            )
+
         appointment_data = {
             "op_number": op_number,
             "patient_id": data.patient_id,
@@ -69,10 +77,11 @@ class AppointmentService:
             "token_number": token_number,
             "room": room,
             "notes": data.notes,
+            "waiting_time_minutes": initial_waiting_time,
+            "eta_started_at": datetime.utcnow().isoformat(),
         }
 
         appointment = self.appointment_repo.create(appointment_data)
-        self.appointment_repo.recalculate_waiting_times()
         return appointment
 
     def get_appointment(self, appointment_id: UUID) -> Appointment:
@@ -159,8 +168,27 @@ class AppointmentService:
         """Get appointments for a patient."""
         return self.appointment_repo.get_patient_appointments(patient_id, skip, limit)
 
-    def call_next_patient(self, doctor_id: UUID) -> Appointment:
-        """Call the next patient in queue for a doctor."""
+    def call_next_patient(self, doctor_id: UUID, reduce_minutes: Optional[int] = None) -> Appointment:
+        """
+        Call the next patient in queue for a doctor.
+
+        This method efficiently:
+        1. Checks if doctor already has a patient in progress
+        2. Gets first waiting patient (by check-in time)
+        3. Updates status to in-progress
+        4. Reduces waiting_time_minutes for all remaining waiting patients
+
+        Args:
+            doctor_id: The doctor's UUID
+            reduce_minutes: Optional custom reduce minutes (default: 15)
+
+        Returns:
+            The called appointment
+
+        Raises:
+            HTTPException: 400 if doctor has patient in progress
+            HTTPException: 404 if no patients waiting
+        """
         # Check if doctor already has a patient in progress
         current = self.appointment_repo.get_current_patient(doctor_id)
         if current:
@@ -169,17 +197,18 @@ class AppointmentService:
                 detail="Complete the current consultation before calling next patient",
             )
 
-        # Get the next waiting patient
-        waiting = self.appointment_repo.get_waiting_queue(doctor_id)
-        if not waiting:
+        # Use the efficient method that performs bulk update in a single transaction
+        result = self.appointment_repo.call_next_patient_efficient(
+            doctor_id=doctor_id,
+            reduce_minutes=reduce_minutes
+        )
+
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No patients waiting in queue",
             )
 
-        next_patient = waiting[0]
-        result = self.appointment_repo.update_status(next_patient.id, AppointmentStatus.IN_PROGRESS)
-        self.appointment_repo.recalculate_waiting_times()
         return result
 
     def complete_appointment(self, appointment_id: UUID) -> Appointment:
@@ -200,8 +229,17 @@ class AppointmentService:
         if room:
             self.appointment_repo.update(appointment_id, {"room": room})
 
+        # Update status (also resets announcement_played flag)
         result = self.appointment_repo.update_status(appointment_id, AppointmentStatus.IN_PROGRESS)
-        self.appointment_repo.recalculate_waiting_times()
+
+        # Reduce waiting times for remaining waiting patients of this doctor
+        if appointment.doctor_id:
+            self.appointment_repo.reduce_waiting_times_for_doctor(
+                doctor_id=appointment.doctor_id,
+                exclude_appointment_id=appointment_id,
+            )
+            self.db.commit()
+
         return result
 
     def complete_consultation(self, appointment_id: UUID) -> Appointment:
@@ -233,11 +271,34 @@ class AppointmentService:
         return result
 
     def add_buffer_time(self, appointment_id: UUID, minutes: int) -> Appointment:
-        """Add buffer time to a patient's consultation slot and recalculate queue."""
+        """Add buffer time to a patient's consultation slot and update queue."""
         appointment = self.get_appointment(appointment_id)
         result = self.appointment_repo.add_buffer_time(appointment_id, minutes)
-        self.appointment_repo.recalculate_waiting_times()
+
+        # Increase waiting times for patients behind this one in the queue
+        if appointment.doctor_id and appointment.token_number:
+            self.appointment_repo.increase_waiting_times_behind(
+                doctor_id=appointment.doctor_id,
+                after_token_number=appointment.token_number,
+                increase_minutes=minutes,
+            )
+            self.db.commit()
+
         return result
+
+    def mark_announcement_played(self, appointment_id: UUID) -> Appointment:
+        """Mark announcement as played for TV display (prevents duplicate announcements)."""
+        appointment = self.get_appointment(appointment_id)
+
+        if appointment.announcement_played:
+            # Already marked, return current state (idempotent)
+            return appointment
+
+        appointment.announcement_played = True
+        appointment.announcement_played_at = datetime.utcnow().isoformat()
+        self.db.commit()
+        self.db.refresh(appointment)
+        return appointment
 
     def get_queue_display(self, doctor_id: Optional[UUID] = None) -> TVDisplayResponse:
         """Get data for TV display page."""
@@ -297,8 +358,12 @@ class AppointmentService:
             queue_type=appointment.queue_type.value,
             room=appointment.room,
             waiting_time_minutes=appointment.waiting_time_minutes,
+            buffer_time_minutes=appointment.buffer_time_minutes,
+            eta_started_at=appointment.eta_started_at,
             called_at=appointment.called_at,
             completed_at=appointment.completed_at,
+            announcement_played=appointment.announcement_played or False,
+            announcement_played_at=appointment.announcement_played_at,
             notes=appointment.notes,
             created_at=appointment.created_at.isoformat() if appointment.created_at else None,
             patient_name=patient.full_name if patient else None,

@@ -26,6 +26,7 @@ from fastapi.exceptions import RequestValidationError
 from app.core.config import settings
 from app.core.database import check_db_connection
 from app.core.startup import run_startup_initialization
+from app.core.socket_manager import socket_app
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.patient_controller import router as patient_router
 from app.controllers.appointment_controller import router as appointment_router
@@ -240,6 +241,15 @@ app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
 
 # TTS Module
 app.include_router(tts_router, prefix=settings.API_V1_PREFIX)
+
+
+# ============================================================
+# Socket.IO - Real-time Updates
+# ============================================================
+
+# Mount Socket.IO ASGI app for real-time queue updates
+# Clients connect to ws://host:port/socket.io/
+app.mount('/socket.io', socket_app)
 
 
 # ============================================================

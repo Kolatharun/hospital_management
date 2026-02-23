@@ -62,6 +62,10 @@ export interface Appointment {
   time: string;
   status: 'waiting' | 'in-progress' | 'completed' | 'cancelled';
   waitingTime?: number;
+  bufferTime?: number;
+  etaStartedAt?: string;
+  announcementPlayed?: boolean;
+  announcementPlayedAt?: string;
   room?: string;
   notes?: string;
   queueType?: 'main' | 'lab' | 'pharmacy';
@@ -229,6 +233,10 @@ function mapApiAppointmentToAppointment(apiApt: ApiAppointment, patients: Patien
     time: apiApt.appointment_time || '',
     status: apiApt.status as Appointment['status'],
     waitingTime: apiApt.waiting_time_minutes || 0,
+    bufferTime: apiApt.buffer_time_minutes || 0,
+    etaStartedAt: apiApt.eta_started_at || undefined,
+    announcementPlayed: apiApt.announcement_played || false,
+    announcementPlayedAt: apiApt.announcement_played_at || undefined,
     room: apiApt.room || undefined,
     notes: apiApt.notes || undefined,
     opNumber: apiApt.op_number,

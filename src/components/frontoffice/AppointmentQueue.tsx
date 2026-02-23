@@ -60,6 +60,24 @@ export function AppointmentQueue() {
     return !!inProgressByDoctor[doctorId];
   };
 
+  // Sort appointments: in-progress first, waiting next, completed last
+  const getStatusPriority = (status: string): number => {
+    switch (status) {
+      case 'in-progress':
+        return 0;
+      case 'waiting':
+        return 1;
+      case 'completed':
+        return 2;
+      default:
+        return 3;
+    }
+  };
+
+  const sortAppointmentsByStatus = (appointments: Appointment[]): Appointment[] => {
+    return [...appointments].sort((a, b) => getStatusPriority(a.status) - getStatusPriority(b.status));
+  };
+
   const handleCall = async (appointment: Appointment) => {
     if (doctorHasPatientInProgress(appointment.doctorId)) {
       toast({
@@ -336,7 +354,7 @@ export function AppointmentQueue() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {group.appointments.map((appointment) => (
+                        {sortAppointmentsByStatus(group.appointments).map((appointment) => (
                           <TableRow key={appointment.id} className="hover:bg-muted/50 transition-colors">
                             <TableCell className="font-mono text-sm font-semibold text-accent">
                               {appointment.opNumber || `OP-${appointment.tokenNumber}`}
@@ -351,7 +369,7 @@ export function AppointmentQueue() {
                               {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
-                                  {appointment.waitingTime || 0} min
+                                  {(appointment.waitingTime || 0) + (appointment.bufferTime || 0)} min
                                 </span>
                               ) : '-'}
                             </TableCell>

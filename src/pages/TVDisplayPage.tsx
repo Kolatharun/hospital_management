@@ -1,20 +1,23 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useClinicData } from '@/contexts/ClinicDataContext';
 import { RefreshCw, Volume2 } from 'lucide-react';
 import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
+import appointmentService from '@/services/appointmentService';
 import logo from '@/assets/logo.jpeg';
 
 export default function TVDisplayPage() {
-  const { getTodayAppointments } = useClinicData();
+  const { getTodayAppointments, refreshAppointments } = useClinicData();
   const { announcePatientCall, stopAudio, teluguVoiceAvailable, englishVoiceAvailable, teluguVoiceName, englishVoiceName } = useVoiceAnnouncement();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
-  const [lastAnnouncedId, setLastAnnouncedId] = useState<string | null>(null);
   const [isAnnouncing, setIsAnnouncing] = useState(false);
-  const announcementIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const announcementInProgressRef = useRef(false);
 
-  // Cleanup audio on unmount
+  // Track which appointment is currently being announced (prevents race conditions)
+  const currentlyAnnouncingIdRef = useRef<string | null>(null);
+  // Track appointments we've already triggered announcements for (prevents duplicate triggers)
+  const triggeredAnnouncementsRef = useRef<Set<string>>(new Set());
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopAudio();
@@ -39,57 +42,63 @@ export default function TVDisplayPage() {
 
   const todayAppointments = getTodayAppointments();
   const waitingPatients = todayAppointments.filter(a => a.status === 'waiting');
-  const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress');
-  const currentPatient = inProgressPatients[0] || null;
+  // Include both 'calling' and 'in-progress' as active patients
+  const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress' || (a.status as string) === 'calling');
 
-  const makeAnnouncement = useCallback(async (opNumber: string, patientName: string, roomNumber: string) => {
-    if (announcementInProgressRef.current) {
+  // Voice announcement effect - uses backend tracking (refresh-safe, multi-TV safe)
+  useEffect(() => {
+    // Find a patient who needs announcement: status is 'calling' or 'in-progress' but not yet announced
+    // We check both statuses because 'calling' can quickly change to 'in-progress'
+    const patientNeedingAnnouncement = todayAppointments.find(
+      apt => ((apt.status as string) === 'calling' || apt.status === 'in-progress') &&
+             !apt.announcementPlayed &&
+             !triggeredAnnouncementsRef.current.has(apt.id)
+    );
+
+    // If we're already announcing any patient, don't start a new one
+    if (currentlyAnnouncingIdRef.current !== null) {
       return;
     }
-    announcementInProgressRef.current = true;
+
+    // If no patient needs announcement, just return (don't clear interval - it manages itself)
+    if (!patientNeedingAnnouncement) {
+      return;
+    }
+
+    // Capture patient info at trigger time - announcement will complete with these values
+    // regardless of any subsequent status changes
+    const appointmentId = patientNeedingAnnouncement.id;
+    const opNumber = patientNeedingAnnouncement.opNumber || `OP-${patientNeedingAnnouncement.tokenNumber}`;
+    const patientName = `${patientNeedingAnnouncement.patient.firstName} ${patientNeedingAnnouncement.patient.lastName}`;
+    const roomNumber = patientNeedingAnnouncement.room || '1';
+
+    // Lock this patient for announcement (do NOT add to triggered set yet - only after voice success)
+    currentlyAnnouncingIdRef.current = appointmentId;
     setIsAnnouncing(true);
 
-    try {
-      await announcePatientCall(opNumber, patientName, roomNumber);
-    } finally {
-      announcementInProgressRef.current = false;
-      setIsAnnouncing(false);
-    }
-  }, [announcePatientCall]);
-
-  // Voice announcement - only trigger on patient ID change
-  useEffect(() => {
-    if (announcementIntervalRef.current) {
-      clearInterval(announcementIntervalRef.current);
-      announcementIntervalRef.current = null;
-    }
-
-    if (!currentPatient) {
-      setLastAnnouncedId(null);
-      return;
-    }
-
-    const opNumber = currentPatient.opNumber || `OP-${currentPatient.tokenNumber}`;
-    const patientName = `${currentPatient.patient.firstName} ${currentPatient.patient.lastName}`;
-    const roomNumber = currentPatient.room || '1';
-
-    // Only announce if patient ID changed
-    if (currentPatient.id !== lastAnnouncedId) {
-      setLastAnnouncedId(currentPatient.id);
-      makeAnnouncement(opNumber, patientName, roomNumber);
-    }
-
-    // Set up 5-minute repeat interval
-    announcementIntervalRef.current = setInterval(() => {
-      makeAnnouncement(opNumber, patientName, roomNumber);
-    }, 5 * 60 * 1000);
-
-    return () => {
-      if (announcementIntervalRef.current) {
-        clearInterval(announcementIntervalRef.current);
-      }
-    };
-  }, [currentPatient?.id, makeAnnouncement, lastAnnouncedId]);
+    // Start announcement - only mark as played AFTER voice completes successfully
+    announcePatientCall(opNumber, patientName, roomNumber)
+      .then(() => {
+        // Voice played successfully - now mark as announced in backend
+        console.log('[Announcement] Voice completed, marking as played:', appointmentId);
+        triggeredAnnouncementsRef.current.add(appointmentId);
+        return appointmentService.markAnnouncementPlayed(appointmentId);
+      })
+      .then(() => refreshAppointments())
+      .catch((error) => {
+        // If skipped due to concurrent announcement, don't add to triggered set (allow retry)
+        if (error?.message === 'ANNOUNCEMENT_SKIPPED') {
+          console.log('[Announcement] Skipped (concurrent), will retry later:', appointmentId);
+        } else {
+          // Other errors - log but don't mark as played (voice didn't complete)
+          console.error('[Announcement] Error (voice not played):', error);
+        }
+      })
+      .finally(() => {
+        currentlyAnnouncingIdRef.current = null;
+        setIsAnnouncing(false);
+      });
+  }, [refreshKey, todayAppointments, announcePatientCall, refreshAppointments]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-IN', {
@@ -208,7 +217,22 @@ export default function TVDisplayPage() {
                   const doctorName = apt.doctorName || 'Doctor';
                   const roomNumber = apt.room || '1';
                   const status = getStatusText(apt.status, index);
-                  const eta = apt.waitingTime !== undefined ? `${apt.waitingTime} min` : (index === 0 ? '0 min' : `${index * 5} min`);
+
+                  // ETA display based on status
+                  const getEtaDisplay = (): string => {
+                    const aptStatus = apt.status as string;
+                    if (aptStatus === 'in-progress') {
+                      return '-';
+                    }
+                    if (aptStatus === 'calling') {
+                      return '0 min';
+                    }
+                    // status === 'waiting' - show raw waitingTime + bufferTime from backend
+                    const waiting = Number(apt.waitingTime ?? 0);
+                    const buffer = Number(apt.bufferTime ?? 0);
+                    return `${waiting + buffer} min`;
+                  };
+                  const eta = getEtaDisplay();
 
                   return (
                     <tr
