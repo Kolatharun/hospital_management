@@ -1,27 +1,53 @@
 import { useState } from 'react';
-import { useAuth, UserRole } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Stethoscope, User, Building2, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Phone, Mail, MapPin, Heart } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
+
+interface FieldErrors {
+  usernameOrEmail?: string;
+  password?: string;
+}
 
 export default function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();
-  const [username, setUsername] = useState('');
+  const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const validateForm = (): boolean => {
+    const errors: FieldErrors = {};
+
+    if (!usernameOrEmail.trim()) {
+      errors.usernameOrEmail = 'Username or email is required';
+    }
+
+    if (!password.trim()) {
+      errors.password = 'Password is required';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
+
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await login(username, password);
+      await login(usernameOrEmail, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -29,164 +55,173 @@ export default function LoginPage() {
     }
   };
 
-  const roles = [
-    {
-      id: 'front-office' as UserRole,
-      title: 'Out Patient (OP)',
-      description: 'Patient registration, appointments & billing',
-      icon: Building2,
-      username: 'frontoffice',
-    },
-    {
-      id: 'doctor' as UserRole,
-      title: 'Doctor',
-      description: 'Patient consultations & prescriptions',
-      icon: Stethoscope,
-      username: 'doctor',
-    },
-  ];
-
-  const handleQuickSelect = (roleUsername: string) => {
-    setUsername(roleUsername);
-    setPassword('');
-    setError('');
-  };
-
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center">
-        <div className="animate-pulse text-primary">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-primary">
+          <Heart className="w-5 h-5 animate-pulse" />
+          <span className="text-lg font-medium">Loading...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex flex-col items-center justify-center p-4">
-      {/* Header */}
-      <div className="text-center mb-8 animate-fade-in">
-        <img
-          src={logo}
-          alt="Balaji Heart Center"
-          className="h-20 mx-auto mb-4"
-        />
-        <p className="text-muted-foreground mt-2">Clinic Management System</p>
-        <p className="text-sm text-accent font-medium mt-1">మీ గుండె ఇక పదిలం</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
+      <div className="min-h-screen flex items-center justify-center p-6 sm:p-8 lg:p-12">
+        <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-center gap-12 lg:gap-20">
 
-      {/* Login Card */}
-      <Card className="w-full max-w-md animate-fade-in border-primary/20">
-        <CardHeader className="text-center">
-          <CardTitle className="text-primary">Welcome Back</CardTitle>
-          <CardDescription>Enter your credentials to continue</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-5">
-            {/* Quick Role Selection */}
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Select Role</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {roles.map((role) => {
-                  const Icon = role.icon;
-                  const isSelected = username.toLowerCase() === role.username;
-                  return (
+          {/* Left Side - Branding Section */}
+          <div className="w-full lg:w-1/2 flex flex-col items-center lg:items-start justify-center text-center lg:text-left">
+            {/* Logo */}
+            <div className="mb-6">
+              <img
+                src={logo}
+                alt="Balaji Heart Center"
+                className="h-28 lg:h-36 w-auto object-contain drop-shadow-md"
+              />
+            </div>
+
+            {/* Clinic Name */}
+            <h1 className="text-2xl lg:text-4xl font-bold text-gray-800 tracking-wide mb-2">
+              BALAJI HEART CENTER
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-gray-500 text-base lg:text-lg mb-3">
+              Clinic Management System
+            </p>
+
+            {/* Telugu Tagline */}
+            <p className="text-rose-600 font-medium text-lg lg:text-xl mb-8 italic">
+              మీ గుండె ఇక పదిలం
+            </p>
+
+            {/* Contact Information */}
+            <div className="space-y-3 text-base text-gray-500">
+              <div className="flex items-center justify-center lg:justify-start gap-3">
+                <MapPin className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>Hyderabad, Telangana, India</span>
+              </div>
+              <div className="flex items-center justify-center lg:justify-start gap-3">
+                <Phone className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>+91 9100079990</span>
+              </div>
+              <div className="flex items-center justify-center lg:justify-start gap-3">
+                <Mail className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>balajiheartcenter.hyd@gmail.com</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Login Card */}
+          <div className="w-full lg:w-1/2 flex items-center justify-center">
+            <div className="w-full max-w-lg bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-8 sm:p-10">
+              {/* Card Header */}
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+                  Welcome Back
+                </h2>
+                <p className="text-base text-gray-500">
+                  Enter your credentials to continue
+                </p>
+              </div>
+
+              {/* Login Form */}
+              <form onSubmit={handleLogin} noValidate className="space-y-5">
+                {/* Username/Email Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="usernameOrEmail" className="text-base font-medium text-gray-700">
+                    Username or Email
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      id="usernameOrEmail"
+                      type="text"
+                      placeholder="Enter your username or email"
+                      value={usernameOrEmail}
+                      onChange={(e) => {
+                        setUsernameOrEmail(e.target.value);
+                        setError('');
+                        setFieldErrors((prev) => ({ ...prev, usernameOrEmail: undefined }));
+                      }}
+                      className={`pl-12 h-12 text-base bg-gray-50/50 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-lg transition-colors ${fieldErrors.usernameOrEmail ? 'border-red-400' : ''}`}
+                      autoComplete="username"
+                    />
+                  </div>
+                  {fieldErrors.usernameOrEmail && (
+                    <p className="text-sm text-red-600">{fieldErrors.usernameOrEmail}</p>
+                  )}
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-base font-medium text-gray-700">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError('');
+                        setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                      }}
+                      className={`pl-12 pr-12 h-12 text-base bg-gray-50/50 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-lg transition-colors ${fieldErrors.password ? 'border-red-400' : ''}`}
+                      autoComplete="current-password"
+                    />
                     <button
-                      key={role.id}
                       type="button"
-                      onClick={() => handleQuickSelect(role.username)}
-                      className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                        }`}
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      <Icon
-                        className={`w-6 h-6 mb-1 ${isSelected ? 'text-primary' : 'text-muted-foreground'
-                          }`}
-                      />
-                      <div className="font-semibold text-sm">{role.title}</div>
-                      <div className="text-xs text-muted-foreground">{role.description}</div>
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+                  {fieldErrors.password && (
+                    <p className="text-sm text-red-600">{fieldErrors.password}</p>
+                  )}
+                </div>
 
-            {/* Username Input */}
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter username"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value);
-                    setError('');
-                  }}
-                  className="pl-10"
-                  required
-                  autoComplete="username"
-                />
-              </div>
-            </div>
+                {/* Error Message */}
+                {error && (
+                  <div className="text-base text-red-600 bg-red-50 border border-red-100 p-4 rounded-lg">
+                    {error}
+                  </div>
+                )}
 
-            {/* Password Input */}
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  className="pl-10 pr-10"
-                  required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                {/* Login Button */}
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-lg font-medium bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 rounded-lg shadow-md hover:shadow-lg active:scale-[0.98]"
+                  disabled={isLoading}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Logging in...
+                    </span>
+                  ) : (
+                    'Login'
+                  )}
+                </Button>
+              </form>
+
+              {/* Footer */}
+              <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                <p className="text-sm text-gray-400">
+                  © 2026 Balaji Heart Center. All rights reserved.
+                </p>
               </div>
             </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md animate-fade-in">
-                {error}
-              </div>
-            )}
-
-            {/* Login Button */}
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
-              size="lg"
-              disabled={!username.trim() || !password.trim() || isLoading}
-            >
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Footer */}
-      <div className="text-center mt-8">
-        <p className="text-xs text-muted-foreground">
-          2026 Balaji Heart Center. All rights reserved.
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Contact: +91 9100079990 | balajiheartcenter.hyd@gmail.com
-        </p>
+          </div>
+        </div>
       </div>
     </div>
   );

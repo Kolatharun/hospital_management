@@ -11,8 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
-import { Users, Clock, FileText, Stethoscope, ArrowLeft, Phone, Plus, Volume2, AlertTriangle } from 'lucide-react';
+import { Users, Clock, FileText, Stethoscope, ArrowLeft, Phone, Plus, AlertTriangle } from 'lucide-react';
 
 export default function DoctorDashboard() {
   const [view, setView] = useState<'dashboard' | 'prescription' | 'history'>('dashboard');
@@ -26,18 +25,9 @@ export default function DoctorDashboard() {
     refreshAppointments,
   } = useClinicData();
   const { toast } = useToast();
-  const { announcePatientCall } = useVoiceAnnouncement();
 
   // Check if doctor profile is linked
   const isDoctorLinked = user?.role === 'doctor' ? user.doctorLinked : true;
-
-  const handleTestVoice = async () => {
-    toast({
-      title: 'Testing Voice',
-      description: 'Playing Telugu announcement...',
-    });
-    await announcePatientCall('001', 'రామ కృష్ణ', '1');
-  };
 
   const handleStartConsultation = async (appointment: Appointment) => {
     try {
@@ -45,12 +35,7 @@ export default function DoctorDashboard() {
       if (appointment.status === 'waiting') {
         await updateAppointmentStatus(appointment.id, 'in-progress');
         await refreshAppointments();
-
-        // Voice announcement on call
-        const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`;
-        const roomNumber = appointment.room || '1';
-        const opNumber = appointment.opNumber || `OP-${appointment.tokenNumber}`;
-        announcePatientCall(opNumber, patientName, roomNumber);
+        // TTS announcement is handled by TVDisplayPage only
       }
 
       setSelectedAppointment(appointment);
@@ -273,22 +258,12 @@ export default function DoctorDashboard() {
           {/* Patient Queue */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Patient Queue</h3>
-                  <Badge className="bg-primary text-primary-foreground">
-                    {waitingCount} waiting
-                  </Badge>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleTestVoice}
-                  className="gap-2 btn-touch"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  Test Telugu Voice
-                </Button>
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Patient Queue</h3>
+                <Badge className="bg-primary text-primary-foreground">
+                  {waitingCount} waiting
+                </Badge>
               </div>
 
               {todayAppointments.length === 0 ? (

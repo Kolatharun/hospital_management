@@ -5,9 +5,24 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
+interface FieldError {
+  field: string;
+  message: string;
+}
+
 interface ApiError {
-  detail: string;
+  detail: string | FieldError;
   error_code?: string;
+}
+
+export class ApiFieldError extends Error {
+  field: string;
+
+  constructor(field: string, message: string) {
+    super(message);
+    this.field = field;
+    this.name = 'ApiFieldError';
+  }
 }
 
 class ApiClient {
@@ -121,7 +136,11 @@ class ApiClient {
       const error: ApiError = await response.json().catch(() => ({
         detail: 'An unexpected error occurred',
       }));
-      throw new Error(error.detail);
+      // Handle field-specific errors (e.g., { field: "username", message: "Username already exists" })
+      if (typeof error.detail === 'object' && error.detail.field && error.detail.message) {
+        throw new ApiFieldError(error.detail.field, error.detail.message);
+      }
+      throw new Error(typeof error.detail === 'string' ? error.detail : 'An unexpected error occurred');
     }
 
     // Handle 204 No Content

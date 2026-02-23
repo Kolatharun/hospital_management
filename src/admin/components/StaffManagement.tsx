@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin, Staff } from '@/admin/context/AdminContext';
 import { adminUserService } from '@/services/adminService';
+import { ApiFieldError } from '@/services/api';
 import { Plus, Pencil, Trash2, Users, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +58,9 @@ export function StaffManagement() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
 
+  // Field-specific error state
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string }>({});
+
   useEffect(() => {
     fetchStaff();
   }, [fetchStaff]);
@@ -65,6 +69,7 @@ export function StaffManagement() {
     setEditingStaff(null);
     setFormData(emptyFormData);
     setShowPassword(false);
+    setFieldErrors({});
     setIsDialogOpen(true);
   };
 
@@ -82,10 +87,14 @@ export function StaffManagement() {
     setShowResetPassword(false);
     setNewPassword('');
     setConfirmPassword('');
+    setFieldErrors({});
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async () => {
+    // Clear previous field errors
+    setFieldErrors({});
+
     if (!formData.name.trim() || !formData.username.trim()) {
       toast.error('Please fill in name and username');
       return;
@@ -124,7 +133,12 @@ export function StaffManagement() {
       }
       setIsDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Operation failed');
+      // Handle field-specific errors
+      if (error instanceof ApiFieldError) {
+        setFieldErrors({ [error.field]: error.message });
+      } else {
+        toast.error(error.message || 'Operation failed');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -284,12 +298,19 @@ export function StaffManagement() {
               <Label>Username *</Label>
               <Input
                 value={formData.username}
-                onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(p => ({ ...p, username: e.target.value }));
+                  if (fieldErrors.username) setFieldErrors(p => ({ ...p, username: undefined }));
+                }}
                 placeholder="john.doe"
-                className="mt-1"
+                className={`mt-1 ${fieldErrors.username ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 disabled={!!editingStaff}
               />
-              {editingStaff ? (
+              {fieldErrors.username ? (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>✕</span> {fieldErrors.username}
+                </p>
+              ) : editingStaff ? (
                 <p className="text-xs text-muted-foreground mt-1">Username cannot be changed</p>
               ) : (
                 <p className="text-xs text-muted-foreground mt-1">Letters, numbers, dots, and underscores only</p>
@@ -326,10 +347,18 @@ export function StaffManagement() {
               <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(p => ({ ...p, email: e.target.value }));
+                  if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: undefined }));
+                }}
                 placeholder="john@clinic.com"
-                className="mt-1"
+                className={`mt-1 ${fieldErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>✕</span> {fieldErrors.email}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3 pt-2">
               <Switch

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useClinicData } from '@/contexts/ClinicDataContext';
 import { RefreshCw, Volume2 } from 'lucide-react';
 import { useVoiceAnnouncement } from '@/hooks/useVoiceAnnouncement';
@@ -6,12 +6,20 @@ import logo from '@/assets/logo.jpeg';
 
 export default function TVDisplayPage() {
   const { getTodayAppointments } = useClinicData();
-  const { announcePatientCall, teluguVoiceAvailable, englishVoiceAvailable, teluguVoiceName, englishVoiceName } = useVoiceAnnouncement();
+  const { announcePatientCall, stopAudio, teluguVoiceAvailable, englishVoiceAvailable, teluguVoiceName, englishVoiceName } = useVoiceAnnouncement();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastAnnouncedId, setLastAnnouncedId] = useState<string | null>(null);
   const [isAnnouncing, setIsAnnouncing] = useState(false);
   const announcementIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const announcementInProgressRef = useRef(false);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [stopAudio]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -32,13 +40,25 @@ export default function TVDisplayPage() {
   const todayAppointments = getTodayAppointments();
   const waitingPatients = todayAppointments.filter(a => a.status === 'waiting');
   const inProgressPatients = todayAppointments.filter(a => a.status === 'in-progress');
-
-  // Get the first in-progress patient for announcements (legacy support)
   const currentPatient = inProgressPatients[0] || null;
 
-  // Voice announcement - announce when patient changes and repeat every 5 minutes
+  const makeAnnouncement = useCallback(async (opNumber: string, patientName: string, roomNumber: string) => {
+    if (announcementInProgressRef.current) {
+      return;
+    }
+    announcementInProgressRef.current = true;
+    setIsAnnouncing(true);
+
+    try {
+      await announcePatientCall(opNumber, patientName, roomNumber);
+    } finally {
+      announcementInProgressRef.current = false;
+      setIsAnnouncing(false);
+    }
+  }, [announcePatientCall]);
+
+  // Voice announcement - only trigger on patient ID change
   useEffect(() => {
-    // Clear any existing interval
     if (announcementIntervalRef.current) {
       clearInterval(announcementIntervalRef.current);
       announcementIntervalRef.current = null;
@@ -53,29 +73,23 @@ export default function TVDisplayPage() {
     const patientName = `${currentPatient.patient.firstName} ${currentPatient.patient.lastName}`;
     const roomNumber = currentPatient.room || '1';
 
-    const makeAnnouncement = async () => {
-      setIsAnnouncing(true);
-      await announcePatientCall(opNumber, patientName, roomNumber);
-      setIsAnnouncing(false);
-    };
-
-    // Announce immediately when a new patient is called
+    // Only announce if patient ID changed
     if (currentPatient.id !== lastAnnouncedId) {
-      makeAnnouncement();
       setLastAnnouncedId(currentPatient.id);
+      makeAnnouncement(opNumber, patientName, roomNumber);
     }
 
     // Set up 5-minute repeat interval
     announcementIntervalRef.current = setInterval(() => {
-      makeAnnouncement();
-    }, 5 * 60 * 1000); // 5 minutes
+      makeAnnouncement(opNumber, patientName, roomNumber);
+    }, 5 * 60 * 1000);
 
     return () => {
       if (announcementIntervalRef.current) {
         clearInterval(announcementIntervalRef.current);
       }
     };
-  }, [currentPatient?.id, todayAppointments, announcePatientCall, lastAnnouncedId]);
+  }, [currentPatient?.id, makeAnnouncement, lastAnnouncedId]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-IN', {
@@ -95,24 +109,18 @@ export default function TVDisplayPage() {
     });
   };
 
-  // Combine all patients for the queue display: in-progress first, then waiting
   const allQueuePatients = [...inProgressPatients, ...waitingPatients];
 
-  // Helper to get row background style based on position and status
   const getRowStyle = (index: number, status: string) => {
-    // 1st patient (Calling / In Consultation) - Orange
     if (index === 0 && (status === 'in-progress' || status === 'calling')) {
       return 'bg-orange-500 text-black font-bold';
     }
-    // 2nd patient (Next to be called / Ready) - Yellow
     if (index === 1) {
       return 'bg-yellow-400 text-black font-bold';
     }
-    // Remaining patients - Black with white text
     return 'bg-black text-white';
   };
 
-  // Helper to get status display text
   const getStatusText = (status: string, index: number) => {
     if (status === 'in-progress') return 'Calling';
     if (status === 'calling') return 'Calling';

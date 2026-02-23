@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin, Department } from '@/admin/context/AdminContext';
+import { ApiFieldError } from '@/services/api';
 import { Plus, Pencil, Trash2, Building2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,6 +45,7 @@ export function DepartmentsManagement() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [formData, setFormData] = useState<DepartmentFormData>(emptyFormData);
   const [submitting, setSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ code?: string; name?: string }>({});
 
   useEffect(() => {
     fetchDepartments();
@@ -53,6 +55,7 @@ export function DepartmentsManagement() {
   const handleAdd = () => {
     setEditingDepartment(null);
     setFormData(emptyFormData);
+    setFieldErrors({});
     setIsDialogOpen(true);
   };
 
@@ -65,10 +68,13 @@ export function DepartmentsManagement() {
       baseConsultationFee: department.baseConsultationFee.toString(),
       isActive: department.isActive,
     });
+    setFieldErrors({});
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async () => {
+    setFieldErrors({});
+
     if (!formData.name.trim() || !formData.code.trim()) {
       toast.error('Please enter department name and code');
       return;
@@ -99,7 +105,11 @@ export function DepartmentsManagement() {
       }
       setIsDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Operation failed');
+      if (error instanceof ApiFieldError) {
+        setFieldErrors({ [error.field]: error.message });
+      } else {
+        toast.error(error.message || 'Operation failed');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -220,23 +230,40 @@ export function DepartmentsManagement() {
               <Label>Department Name *</Label>
               <Input
                 value={formData.name}
-                onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(p => ({ ...p, name: e.target.value }));
+                  if (fieldErrors.name) setFieldErrors(p => ({ ...p, name: undefined }));
+                }}
                 placeholder="Cardiology"
-                className="mt-1"
+                className={`mt-1 ${fieldErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
+              {fieldErrors.name && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>✕</span> {fieldErrors.name}
+                </p>
+              )}
             </div>
             <div>
               <Label>Department Code *</Label>
               <Input
                 value={formData.code}
-                onChange={(e) => setFormData(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                onChange={(e) => {
+                  setFormData(p => ({ ...p, code: e.target.value.toUpperCase() }));
+                  if (fieldErrors.code) setFieldErrors(p => ({ ...p, code: undefined }));
+                }}
                 placeholder="CARDIO"
-                className="mt-1 font-mono"
+                className={`mt-1 font-mono ${fieldErrors.code ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 maxLength={20}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Unique identifier (e.g., CARDIO, GENMED, ORTHO)
-              </p>
+              {fieldErrors.code ? (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>✕</span> {fieldErrors.code}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Unique identifier (e.g., CARDIO, GENMED, ORTHO)
+                </p>
+              )}
             </div>
             <div>
               <Label>Description</Label>

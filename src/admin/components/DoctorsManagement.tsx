@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin, Doctor, Staff } from '@/admin/context/AdminContext';
 import { adminUserService } from '@/services/adminService';
+import { ApiFieldError } from '@/services/api';
 import { Plus, Pencil, Trash2, Stethoscope, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,6 +62,7 @@ export function DoctorsManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Staff[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ registration_number?: string; email?: string; user_id?: string }>({});
 
   useEffect(() => {
     fetchDoctors();
@@ -130,6 +132,7 @@ export function DoctorsManagement() {
   const handleAdd = () => {
     setEditingDoctor(null);
     setFormData(emptyFormData);
+    setFieldErrors({});
     fetchAvailableUsers(null);
     setIsDialogOpen(true);
   };
@@ -149,12 +152,15 @@ export function DoctorsManagement() {
       userId: doctor.userId || '',
       isAvailable: doctor.isAvailable,
     });
+    setFieldErrors({});
     // Pass the currently linked user ID so it's included in available users
     fetchAvailableUsers(doctor.userId);
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async () => {
+    setFieldErrors({});
+
     if (!formData.name.trim()) {
       toast.error('Please enter doctor name');
       return;
@@ -185,7 +191,11 @@ export function DoctorsManagement() {
       }
       setIsDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Operation failed');
+      if (error instanceof ApiFieldError) {
+        setFieldErrors({ [error.field]: error.message });
+      } else {
+        toast.error(error.message || 'Operation failed');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -360,10 +370,18 @@ export function DoctorsManagement() {
                 <Input
                   id="dRegNo"
                   value={formData.registrationNumber}
-                  onChange={(e) => setFormData(p => ({ ...p, registrationNumber: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(p => ({ ...p, registrationNumber: e.target.value }));
+                    if (fieldErrors.registration_number) setFieldErrors(p => ({ ...p, registration_number: undefined }));
+                  }}
                   placeholder="MCI-12345"
-                  className="mt-1"
+                  className={`mt-1 ${fieldErrors.registration_number ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
+                {fieldErrors.registration_number && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <span>✕</span> {fieldErrors.registration_number}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -385,10 +403,18 @@ export function DoctorsManagement() {
                   id="dEmail"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(p => ({ ...p, email: e.target.value }));
+                    if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: undefined }));
+                  }}
                   placeholder="doctor@clinic.com"
-                  className="mt-1"
+                  className={`mt-1 ${fieldErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
+                {fieldErrors.email && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <span>✕</span> {fieldErrors.email}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -424,10 +450,13 @@ export function DoctorsManagement() {
               <Label htmlFor="dUser">Link to User Account</Label>
               <Select
                 value={formData.userId || 'none'}
-                onValueChange={handleUserSelect}
+                onValueChange={(value) => {
+                  handleUserSelect(value);
+                  if (fieldErrors.user_id) setFieldErrors(p => ({ ...p, user_id: undefined }));
+                }}
                 disabled={loadingUsers}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className={`mt-1 ${fieldErrors.user_id ? 'border-destructive focus-visible:ring-destructive' : ''}`}>
                   <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select user account (for login)"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -444,10 +473,16 @@ export function DoctorsManagement() {
                   )}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Link this doctor to a user account to allow them to login.
-                {availableUsers.length > 0 && " Selecting a user will auto-populate name and email fields."}
-              </p>
+              {fieldErrors.user_id ? (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>✕</span> {fieldErrors.user_id}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Link this doctor to a user account to allow them to login.
+                  {availableUsers.length > 0 && " Selecting a user will auto-populate name and email fields."}
+                </p>
+              )}
             </div>
 
             {/* Availability Toggle */}

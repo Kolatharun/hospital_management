@@ -8,7 +8,7 @@ import api from './api';
 export type UserRole = 'admin' | 'front-office' | 'doctor';
 
 export interface LoginRequest {
-  username: string;
+  username_or_email: string;
   password: string;
 }
 
