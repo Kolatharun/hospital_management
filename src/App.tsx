@@ -15,7 +15,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper
+// Protected route wrapper - includes ClinicDataProvider for authenticated users
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -30,10 +30,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  return <>{children}</>;
+
+  // Only provide clinic data context when authenticated
+  return <ClinicDataProvider>{children}</ClinicDataProvider>;
 }
 
-// Admin protected route - only allows admin users
+// Admin protected route - only allows admin users, includes ClinicDataProvider
 function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
 
@@ -53,10 +55,13 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/" replace />;
   }
 
+  // Only provide clinic data context when authenticated as admin
   return (
-    <AdminProvider>
-      {children}
-    </AdminProvider>
+    <ClinicDataProvider>
+      <AdminProvider>
+        {children}
+      </AdminProvider>
+    </ClinicDataProvider>
   );
 }
 
@@ -103,7 +108,14 @@ function AppRoutes() {
           </AdminProtectedRoute>
         }
       />
-      <Route path="/tv-display" element={<TVDisplayPage />} />
+      <Route
+        path="/tv-display"
+        element={
+          <ProtectedRoute>
+            <TVDisplayPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -112,15 +124,13 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <ClinicDataProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </ClinicDataProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

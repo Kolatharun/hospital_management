@@ -107,6 +107,13 @@ class ApiClient {
   ): Promise<T> {
     const token = this.getAccessToken();
 
+    // Skip API calls for protected endpoints when no token exists
+    // Auth endpoints (/auth/*) are allowed without token
+    const isAuthEndpoint = endpoint.startsWith('/auth/');
+    if (!token && !isAuthEndpoint) {
+      throw new Error('Not authenticated');
+    }
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,

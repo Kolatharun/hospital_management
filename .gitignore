@@ -1,5 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Environment files (local config)
+.env
+.env.local
+.env.*.local
+backend/.env
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,15 +21,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -23,4 +32,38 @@ dist-ssr
 *.sln
 *.sw?
 
+# Vite temp files
+*.timestamp-*
 
+# Alternative package managers
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+backend/uploads/
+
+# Google Cloud credentials
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!components.json
+
+# OS files
+Thumbs.db

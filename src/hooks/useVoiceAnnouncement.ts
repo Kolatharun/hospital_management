@@ -11,9 +11,18 @@ export function useVoiceAnnouncement() {
     language: 'telugu' | 'english'
   ): Promise<void> => {
     try {
+      // Get auth token for protected TTS endpoint
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/v1/tts/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ text, language }),
       });
 

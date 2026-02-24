@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     BCRYPT_ROUNDS: int = 12
 
     # CORS - Frontend runs on Vite default port (also allow common dev ports)
-    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:8081,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4173,http://127.0.0.1:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:8080,http://localhost:8081,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4173,http://127.0.0.1:3000,http://127.0.0.1:8080"
 
     # Email (SMTP) - for sending bill receipts
     SMTP_HOST: str = ""
