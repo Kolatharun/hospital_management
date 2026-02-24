@@ -23,7 +23,7 @@ import enum
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import Column, String, Date, Enum, Text, event
+from sqlalchemy import Column, String, Date, Enum, Text
 from sqlalchemy.orm import validates
 
 from app.models.base import BaseModel
@@ -203,19 +203,3 @@ class Patient(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Patient(id={self.id}, mr_number={self.mr_number}, name={self.full_name})>"
-
-
-def generate_mr_number(mapper, connection, target):
-    """Generate MR number before insert if not provided."""
-    if not target.mr_number:
-        # Get the next sequence number
-        result = connection.execute(
-            "SELECT COUNT(*) + 1 FROM patients"
-        )
-        count = result.scalar()
-        target.mr_number = f"MR-{count:05d}"
-
-
-# Register event listener for auto MR number generation
-# Note: In production, use a database sequence for better concurrency
-event.listen(Patient, "before_insert", generate_mr_number)

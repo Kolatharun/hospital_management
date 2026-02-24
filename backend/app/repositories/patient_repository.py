@@ -128,10 +128,48 @@ class PatientRepository(BaseRepository[Patient]):
         ).order_by(Patient.created_at.desc()).all()
 
     def generate_mr_number(self) -> str:
-        """Generate next MR number using sequence."""
+        """
+        Generate next MR number using PostgreSQL sequence.
+
+        Uses database sequence for:
+        - Guaranteed uniqueness under concurrent access
+        - No gaps under normal operation
+        - Atomic increment operation
+
+        Returns:
+            str: Formatted MR number (e.g., "MR-00001")
+
+        Raises:
+            SQLAlchemyError: If sequence doesn't exist or DB error occurs
+        """
         result = self.db.execute(text("SELECT nextval('mr_number_seq')"))
         seq_val = result.scalar()
         return f"MR-{seq_val:05d}"
+
+    def get_current_mr_sequence_value(self) -> int:
+        """
+        Get current sequence value without incrementing.
+
+        Useful for admin dashboards to show next MR number.
+
+        Returns:
+            int: Current sequence value (next MR will be this + 1)
+        """
+        result = self.db.execute(text("SELECT last_value FROM mr_number_seq"))
+        return result.scalar() or 0
+
+    def reset_mr_sequence(self, start_value: int = 1) -> None:
+        """
+        Reset MR sequence to a specific value.
+
+        WARNING: Only use during initial setup or data migration.
+        Should NOT be used in production with existing patients.
+
+        Args:
+            start_value: Value to restart the sequence from
+        """
+        self.db.execute(text(f"ALTER SEQUENCE mr_number_seq RESTART WITH {start_value}"))
+        self.db.commit()
 
     def phone_exists(self, phone: str, exclude_id: Optional[UUID] = None) -> bool:
         """Check if phone number already exists."""

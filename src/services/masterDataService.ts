@@ -18,6 +18,14 @@ export interface LabTest extends MasterDataItem {
     test_name: string;
 }
 
+export interface Medicine extends MasterDataItem {
+    name: string;
+    generic_name?: string;
+    specialization: string;
+    dosage_form?: string;
+    strength?: string;
+}
+
 class MasterDataService {
     async searchComplaints(query: string, limit: number = 20): Promise<Complaint[]> {
         if (!query || query.length < 1) return [];
@@ -32,6 +40,11 @@ class MasterDataService {
     async searchLabTests(query: string, limit: number = 20): Promise<LabTest[]> {
         if (!query || query.length < 1) return [];
         return api.get<LabTest[]>(`/master/lab-tests/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+    }
+
+    async searchMedicines(query: string, limit: number = 20): Promise<Medicine[]> {
+        if (!query || query.length < 3) return [];
+        return api.get<Medicine[]>(`/master/medicines/search?q=${encodeURIComponent(query)}&limit=${limit}`);
     }
 }
 

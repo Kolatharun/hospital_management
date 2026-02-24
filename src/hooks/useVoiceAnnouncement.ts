@@ -89,7 +89,7 @@ export function useVoiceAnnouncement() {
     console.log('[TTS] Starting announcement for:', opNumber, patientName);
 
     const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి రూమ్ నెంబర్ ${roomNumber} కి వెళ్లండి.`;
-    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to room number ${roomNumber}.`;
+    const englishText = `O P number ${opNumber}, name ${patientName}, please proceed to room number ${roomNumber}.`;
 
     try {
       await speak(teluguText, 'telugu');
@@ -121,7 +121,7 @@ export function useVoiceAnnouncement() {
     isAnnouncingRef.current = true;
 
     const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి ల్యాబ్ కి వెళ్లండి.`;
-    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to the lab.`;
+    const englishText = `O P number ${opNumber}, name ${patientName}, please proceed to the lab.`;
 
     try {
       await speak(teluguText, 'telugu');
@@ -150,7 +150,7 @@ export function useVoiceAnnouncement() {
     isAnnouncingRef.current = true;
 
     const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి ఫార్మసీ కి వెళ్లండి.`;
-    const englishText = `OP number ${opNumber}, name ${patientName}, please proceed to the pharmacy.`;
+    const englishText = `O P number ${opNumber}, name ${patientName}, please proceed to the pharmacy.`;
 
     try {
       await speak(teluguText, 'telugu');

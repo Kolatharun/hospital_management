@@ -29,6 +29,16 @@ class LabTestResponse(MasterDataBase):
     test_name: str
 
 
+class MedicineResponse(MasterDataBase):
+    """Response schema for medicine master data."""
+    id: UUID
+    name: str
+    generic_name: Optional[str] = None
+    specialization: str
+    dosage_form: Optional[str] = None
+    strength: Optional[str] = None
+
+
 class SearchQuery(BaseModel):
     q: str
     limit: Optional[int] = 10

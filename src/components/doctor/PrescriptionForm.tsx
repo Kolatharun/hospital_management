@@ -19,7 +19,7 @@ import logo from '@/assets/logo.jpeg';
 import vitalsService from '@/services/vitalsService';
 import documentService from '@/services/documentService';
 import prescriptionService from '@/services/prescriptionService';
-import masterDataService, { Complaint, Diagnosis, LabTest } from '@/services/masterDataService';
+import masterDataService, { Complaint, Diagnosis, LabTest, Medicine as MedicineMaster } from '@/services/masterDataService';
 import doctorService, { DoctorProfile } from '@/services/doctorService';
 import type { Document as PatientDocument } from '@/services/documentService';
 import { DocumentViewer } from './DocumentViewer';
@@ -50,19 +50,6 @@ interface DraftData {
   advice: string;
   savedAt: string;
 }
-
-const COMMON_MEDICINES = [
-  'Amlodipine',
-  'Atorvastatin',
-  'Aspirin',
-  'Metoprolol',
-  'Losartan',
-  'Clopidogrel',
-  'Ramipril',
-  'Furosemide',
-  'Carvedilol',
-  'Digoxin',
-];
 
 const DRAFT_STORAGE_KEY = 'prescription_draft_';
 
@@ -170,6 +157,8 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
   const [labSearch, setLabSearch] = useState('');
   const [labSuggestions, setLabSuggestions] = useState<LabTest[]>([]);
   const [labTests, setLabTests] = useState('');
+
+  const [medicineSuggestions, setMedicineSuggestions] = useState<MedicineMaster[]>([]);
   const [advice, setAdvice] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -471,6 +460,25 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     return () => clearTimeout(timer);
   }, [labSearch]);
 
+  // Fetch medicine suggestions from API (minimum 3 characters)
+  useEffect(() => {
+    const fetchMedicines = async () => {
+      if (medicineSearch.length >= 3) {
+        try {
+          const results = await masterDataService.searchMedicines(medicineSearch);
+          setMedicineSuggestions(results);
+        } catch (error) {
+          console.error('Failed to fetch medicine suggestions', error);
+        }
+      } else {
+        setMedicineSuggestions([]);
+      }
+    };
+
+    const timer = setTimeout(fetchMedicines, 300);
+    return () => clearTimeout(timer);
+  }, [medicineSearch]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -508,9 +516,6 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
     autoResizeTextarea(adviceTextareaRef.current);
   }, [advice, autoResizeTextarea]);
 
-  const filteredMedicines = COMMON_MEDICINES.filter(m =>
-    m.toLowerCase().includes(medicineSearch.toLowerCase()) && medicineSearch.length >= 3
-  );
 
   const handleAddMedicine = (medicineName?: string) => {
     const name = medicineName || medicineSearch;
@@ -542,6 +547,7 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
 
   const handleSelectMedicine = (medicineName: string) => {
     setMedicineSearch(medicineName);
+    setMedicineSuggestions([]);
   };
 
   const getDocumentFileUrl = (doc: PatientDocument) => {
@@ -1522,15 +1528,25 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
                 </div>
               </div>
 
-              {filteredMedicines.length > 0 && (
-                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm">
-                  {filteredMedicines.map(m => (
+              {medicineSuggestions.length > 0 && (
+                <div className="mt-1 p-2 border rounded-md bg-background shadow-sm max-h-60 overflow-y-auto">
+                  {medicineSuggestions.map(m => (
                     <button
-                      key={m}
-                      onClick={() => handleSelectMedicine(m)}
-                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded"
+                      key={m.id}
+                      onClick={() => handleSelectMedicine(m.name)}
+                      className="block w-full text-left px-2 py-1 hover:bg-muted rounded text-sm"
                     >
-                      {m}
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{m.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{m.code}</span>
+                      </div>
+                      {(m.strength || m.generic_name) && (
+                        <div className="text-xs text-muted-foreground">
+                          {m.strength && <span>{m.strength}</span>}
+                          {m.strength && m.generic_name && <span> | </span>}
+                          {m.generic_name && <span>{m.generic_name}</span>}
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>

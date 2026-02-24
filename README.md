@@ -1,73 +1,102 @@
-# Welcome to your Lovable project
+# Balaji Heart Center - Hospital Management System
 
-## Project info
+A comprehensive hospital management system for Balaji Heart Center, featuring patient management, appointment scheduling, queue management, billing, and more.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Patient Management**: Register and manage patient records with complete medical history
+- **Appointment Scheduling**: Book and manage doctor appointments with buffer time support
+- **Queue Management**: Real-time queue tracking with TV display and voice announcements
+- **Billing System**: Generate bills and receipts for consultations and lab services
+- **Prescription Management**: Digital prescription creation and management
+- **Master Data Management**: Configure doctors, medicines, and other master data
+- **Role-based Access**: Admin, Doctor, and Front Office user roles
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
+- React with TypeScript
+- Vite (build tool)
+- Tailwind CSS (styling)
+- shadcn/ui (component library)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Backend
+- Python with FastAPI
+- SQLAlchemy (ORM)
+- Alembic (database migrations)
+- PostgreSQL (database)
 
-Changes made via Lovable will be committed automatically to this repo.
+## Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Node.js 18+ and npm
+- Python 3.10+
+- PostgreSQL
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Frontend Setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Backend Setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+# Navigate to backend directory
+cd backend
 
-**Use GitHub Codespaces**
+# Create virtual environment
+python -m venv venv
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 
-## What technologies are used for this project?
+# Install dependencies
+pip install -r requirements.txt
 
-This project is built with:
+# Run database migrations
+alembic upgrade head
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+# Start the server
+uvicorn app.main:app --reload
+```
 
-## How can I deploy this project?
+## Project Structure
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+├── src/                    # Frontend source code
+│   ├── components/         # React components
+│   ├── pages/              # Page components
+│   ├── services/           # API services
+│   └── hooks/              # Custom React hooks
+├── backend/                # Backend source code
+│   ├── app/
+│   │   ├── controllers/    # API controllers
+│   │   ├── models/         # Database models
+│   │   ├── repositories/   # Data access layer
+│   │   ├── schemas/        # Pydantic schemas
+│   │   └── services/       # Business logic
+│   └── alembic/            # Database migrations
+└── public/                 # Static assets
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Environment Variables
 
-Yes, you can!
+Create a `.env` file in the backend directory with the following variables:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/balaji_heart_center
+SECRET_KEY=your-secret-key
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## License
+
+This project is proprietary software for Balaji Heart Center.
