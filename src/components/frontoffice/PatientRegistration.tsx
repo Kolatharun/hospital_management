@@ -637,95 +637,128 @@ export function PatientRegistration({ onRegistrationComplete }: PatientRegistrat
 
         <TabsContent value="new">
           <form onSubmit={handleSubmit} noValidate>
+            {/* Patient Type Selection - At Top */}
+            <div className="mb-6">
+              <div className="w-full max-w-xs">
+                <Label htmlFor="patientType" className="mb-2 block">
+                  Patient Type <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.patientType}
+                  onValueChange={(value) => {
+                    handleChange('patientType', value);
+                    // Clear selected patient when switching to New Patient
+                    if (value === 'New' && selectedExistingPatient) {
+                      setSelectedExistingPatient(null);
+                      setExistingMRSearch('');
+                      setSearchResults([]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select patient type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="New">New Patient</SelectItem>
+                    <SelectItem value="Review">Old Patient</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Patient Identity Card */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <User className="w-4 h-4" />
-                    Patient Identity
+                    Patient Details
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Search Existing Patient */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Search className="w-3 h-3" />
-                      Search Existing Patient
-                    </Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by MR Number, OP Number, Phone, Email, or Name..."
-                        value={existingMRSearch}
-                        onChange={(e) => setExistingMRSearch(e.target.value)}
-                        className="pl-10"
-                      />
-                      {isSearching && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                      )}
-                    </div>
-
-                    {searchError && (
-                      <div className="flex items-center gap-2 p-2 bg-destructive text-destructive-foreground rounded-md text-sm">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{searchError}</span>
-                      </div>
-                    )}
-
-                    {searchResults.length > 0 && !selectedExistingPatient && (
-                      <div className="border rounded-lg divide-y max-h-48 overflow-y-auto bg-background shadow-lg">
-                        {searchResults.map((patient) => (
-                          <div
-                            key={patient.id}
-                            className="p-3 flex items-center justify-between hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => handleSelectExistingPatient(patient)}
-                          >
-                            <div>
-                              <p className="font-semibold text-sm">{patient.first_name} {patient.last_name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {patient.mr_number} | {patient.phone} | {patient.gender}
-                                {patient.date_of_birth && ` | DOB: ${format(new Date(patient.date_of_birth), 'dd/MM/yyyy')}`}
-                              </p>
-                            </div>
-                            <Button size="sm" variant="outline" className="text-xs">Select</Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {existingMRSearch.length >= 2 && !isSearching && searchResults.length === 0 && !searchError && (
-                      <div className="text-center py-2 text-sm text-muted-foreground">
-                        No patients found matching "{existingMRSearch}"
-                      </div>
-                    )}
-
-                    {selectedExistingPatient && (
-                      <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded-md">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-primary" />
-                          <span className="text-sm font-medium">
-                            {selectedExistingPatient.firstName} {selectedExistingPatient.lastName} ({selectedExistingPatient.mrNumber})
-                          </span>
+                  {/* Search Existing Patient - Only visible for Review patients */}
+                  {formData.patientType === 'Review' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Search className="w-3 h-3" />
+                          Search Existing Patient
+                        </Label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search by MR Number or OP Number..."
+                            value={existingMRSearch}
+                            onChange={(e) => setExistingMRSearch(e.target.value)}
+                            className="pl-10"
+                          />
+                          {isSearching && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedExistingPatient(null);
-                            setExistingMRSearch('');
-                            handleClear();
-                          }}
-                          className="h-6 px-2"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="border-t pt-4" />
+                        {searchError && (
+                          <div className="flex items-center gap-2 p-2 bg-destructive text-destructive-foreground rounded-md text-sm">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{searchError}</span>
+                          </div>
+                        )}
+
+                        {searchResults.length > 0 && !selectedExistingPatient && (
+                          <div className="border rounded-lg divide-y max-h-48 overflow-y-auto bg-background shadow-lg">
+                            {searchResults.map((patient) => (
+                              <div
+                                key={patient.id}
+                                className="p-3 flex items-center justify-between hover:bg-muted/50 cursor-pointer transition-colors"
+                                onClick={() => handleSelectExistingPatient(patient)}
+                              >
+                                <div>
+                                  <p className="font-semibold text-sm">{patient.first_name} {patient.last_name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {patient.mr_number} | {patient.phone} | {patient.gender}
+                                    {patient.date_of_birth && ` | DOB: ${format(new Date(patient.date_of_birth), 'dd/MM/yyyy')}`}
+                                  </p>
+                                </div>
+                                <Button size="sm" variant="outline" className="text-xs">Select</Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {existingMRSearch.length >= 2 && !isSearching && searchResults.length === 0 && !searchError && (
+                          <div className="text-center py-2 text-sm text-muted-foreground">
+                            No patients found matching "{existingMRSearch}"
+                          </div>
+                        )}
+
+                        {selectedExistingPatient && (
+                          <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded-md">
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-primary" />
+                              <span className="text-sm font-medium">
+                                {selectedExistingPatient.firstName} {selectedExistingPatient.lastName} ({selectedExistingPatient.mrNumber})
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedExistingPatient(null);
+                                setExistingMRSearch('');
+                                handleClear();
+                              }}
+                              className="h-6 px-2"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t pt-4" />
+                    </>
+                  )}
 
                   {/* Name Fields */}
                   <div className="grid grid-cols-2 gap-4">
@@ -798,7 +831,7 @@ export function PatientRegistration({ onRegistrationComplete }: PatientRegistrat
                     </div>
                   </div>
 
-                  {/* Marital Status, Patient Type */}
+                  {/* Marital Status */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="maritalStatus">Marital Status</Label>
@@ -814,22 +847,6 @@ export function PatientRegistration({ onRegistrationComplete }: PatientRegistrat
                           <SelectItem value="Married">Married</SelectItem>
                           <SelectItem value="Widowed">Widowed</SelectItem>
                           <SelectItem value="Divorced">Divorced</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="patientType">Patient Type</Label>
-                      <Select
-                        value={formData.patientType}
-                        onValueChange={(value) => handleChange('patientType', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="New">New Patient</SelectItem>
-                          <SelectItem value="Review">Review</SelectItem>
-                          <SelectItem value="Emergency">Emergency</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -41,7 +41,7 @@ const tabs = [
   },
   {
     id: 'documents',
-    label: 'Documents',
+    label: 'Reports',
     icon: <FileText className="w-4 h-4" />,
   },
   {

@@ -2,13 +2,13 @@
 Billing Controller - Bill management and payment endpoints
 """
 
-import os
+import io
 from typing import Optional
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Body, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Query, Body, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -60,6 +60,83 @@ def get_day_summary(
     """Get billing summary for a day."""
     service = BillingService(db)
     return service.get_day_summary(target_date)
+
+
+@router.get("/summary/pdf")
+def download_day_summary_pdf(
+    target_date: Optional[date] = Query(None, description="Date for summary PDF, defaults to today"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE, UserRole.DOCTOR])),
+):
+    """Generate and download day payment summary as PDF.
+
+    Accessible by front_office and doctor roles.
+    Uses the same PDF generation logic as the email flow.
+    Returns StreamingResponse with PDF content.
+    """
+    from datetime import date as date_type
+    from app.utils.receipt_generator import generate_day_summary_pdf
+    from app.utils.notification_service import cleanup_temp_file
+
+    service = BillingService(db)
+
+    # Use today if no date provided
+    summary_date = target_date or date_type.today()
+    summary = service.get_day_summary(summary_date)
+    bills = service.search_bills(from_date=summary_date, to_date=summary_date, limit=100)
+
+    formatted_date = summary_date.strftime("%d-%m-%Y")
+    bills_data = [
+        {
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "bill_number": b.bill_number,
+            "patient_name": b.patient_name,
+            "uhid": b.uhid or "-",
+            "payment_method": b.payment_method.value if b.payment_method else None,
+            "paid_amount": float(b.paid_amount or 0),
+        }
+        for b in bills
+    ]
+
+    pdf_path = None
+    try:
+        pdf_path = generate_day_summary_pdf(
+            summary_date=formatted_date,
+            cash_total=float(summary.cash_amount),
+            card_total=float(summary.card_amount),
+            upi_total=float(summary.upi_amount),
+            grand_total=float(summary.total_paid),
+            total_transactions=summary.total_bills,
+            bills=bills_data,
+        )
+
+        # Read PDF into memory for streaming
+        with open(pdf_path, "rb") as f:
+            pdf_content = f.read()
+
+        # Clean up temp file immediately after reading
+        cleanup_temp_file(pdf_path)
+
+        filename = f"DaySummary_{formatted_date}.pdf"
+        return StreamingResponse(
+            io.BytesIO(pdf_content),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_content)),
+            },
+        )
+    except HTTPException:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
+        raise
+    except Exception as e:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}",
+        )
 
 
 @router.get("/pending", response_model=list[BillResponse])
@@ -288,35 +365,52 @@ def update_bill(
 @router.get("/{bill_id}/receipt-pdf")
 def download_receipt_pdf(
     bill_id: UUID,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.FRONT_OFFICE, UserRole.DOCTOR])),
 ):
-    """Generate and download bill receipt as PDF."""
+    """Generate and download bill receipt as PDF.
+
+    Accessible by front_office and doctor roles.
+    Returns StreamingResponse with PDF content.
+    Temp file is cleaned up after response is sent.
+    """
     from app.utils.receipt_generator import generate_receipt_pdf
     from app.utils.notification_service import cleanup_temp_file
 
     service = BillingService(db)
     bill = service.get_bill(bill_id)
 
+    pdf_path = None
     try:
         pdf_path = generate_receipt_pdf(bill)
+
+        # Read PDF into memory for streaming
+        with open(pdf_path, "rb") as f:
+            pdf_content = f.read()
+
+        # Clean up temp file immediately after reading
+        cleanup_temp_file(pdf_path)
+
+        filename = f"Receipt_{bill.bill_number}.pdf"
+        return StreamingResponse(
+            io.BytesIO(pdf_content),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_content)),
+            },
+        )
+    except HTTPException:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
+        raise
     except Exception as e:
+        if pdf_path:
+            cleanup_temp_file(pdf_path)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate PDF: {str(e)}",
         )
-
-    # Schedule cleanup after response is sent
-    background_tasks.add_task(cleanup_temp_file, pdf_path)
-
-    filename = f"Receipt_{bill.bill_number}.pdf"
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        filename=filename,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
 @router.post("/{bill_id}/send-email")

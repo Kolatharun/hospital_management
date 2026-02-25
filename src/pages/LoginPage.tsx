@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Lock, Eye, EyeOff, Phone, Mail, MapPin, Heart } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Phone, Mail, MapPin, Heart, Globe } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 
 interface FieldErrors {
@@ -110,6 +110,17 @@ export default function LoginPage() {
               <div className="flex items-center justify-center lg:justify-start gap-3">
                 <Mail className="w-5 h-5 text-teal-600 flex-shrink-0" />
                 <span>balajiheartcenter.hyd@gmail.com</span>
+              </div>
+              <div className="flex items-center justify-center lg:justify-start gap-3">
+                <Globe className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <a
+                  href="http://www.balajiheartcenter.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-600 hover:text-teal-700 hover:underline transition-colors"
+                >
+                  www.balajiheartcenter.com
+                </a>
               </div>
             </div>
           </div>

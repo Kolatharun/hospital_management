@@ -27,7 +27,8 @@ export function AppointmentQueue() {
 
   const todayAppointments = getTodayAppointments();
   const waitingAppointments = todayAppointments.filter(a => a.status === 'waiting');
-  const inProgressAppointments = todayAppointments.filter(a => a.status === 'in-progress');
+  // Include both 'calling' and 'in-progress' as active patients
+  const inProgressAppointments = todayAppointments.filter(a => a.status === 'in-progress' || a.status === 'calling');
   const completedAppointments = todayAppointments.filter(a => a.status === 'completed');
 
   // Group appointments by doctor
@@ -60,9 +61,11 @@ export function AppointmentQueue() {
     return !!inProgressByDoctor[doctorId];
   };
 
-  // Sort appointments: in-progress first, waiting next, completed last
+  // Sort appointments: calling/in-progress first, waiting next, completed last
   const getStatusPriority = (status: string): number => {
     switch (status) {
+      case 'calling':
+        return 0;
       case 'in-progress':
         return 0;
       case 'waiting':
@@ -166,6 +169,8 @@ export function AppointmentQueue() {
           return <Badge className="bg-warning/20 text-warning border-warning/30 font-bold">Pending</Badge>;
         }
         return <Badge className="bg-warning/20 text-warning border-warning/30 font-bold">Waiting</Badge>;
+      case 'calling':
+        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 font-bold">Calling</Badge>;
       case 'in-progress':
         return <Badge className="bg-primary/20 text-primary border-primary/30 font-bold">In Progress</Badge>;
       case 'completed':
@@ -366,7 +371,7 @@ export function AppointmentQueue() {
                               {appointment.patient.firstName} {appointment.patient.lastName}
                             </TableCell>
                             <TableCell>
-                              {(appointment.status === 'waiting' || appointment.status === 'in-progress') ? (
+                              {(appointment.status === 'waiting' || appointment.status === 'calling' || appointment.status === 'in-progress') ? (
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
                                   {(appointment.waitingTime || 0) + (appointment.bufferTime || 0)} min
@@ -398,6 +403,9 @@ export function AppointmentQueue() {
                                       Buffer (+5m)
                                     </Button>
                                   </>
+                                )}
+                                {appointment.status === 'calling' && (
+                                  <span className="text-sm text-destructive font-medium animate-pulse">Calling...</span>
                                 )}
                                 {appointment.status === 'in-progress' && (
                                   <span className="text-sm text-primary font-medium">With Doctor</span>

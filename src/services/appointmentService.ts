@@ -134,6 +134,10 @@ export const appointmentService = {
   async markAnnouncementPlayed(appointmentId: string): Promise<Appointment> {
     return api.post<Appointment>(`/appointments/${appointmentId}/mark-announced`);
   },
+
+  async completeAnnouncement(appointmentId: string): Promise<Appointment> {
+    return api.post<Appointment>(`/appointments/${appointmentId}/complete-announcement`);
+  },
 };
 
 export default appointmentService;

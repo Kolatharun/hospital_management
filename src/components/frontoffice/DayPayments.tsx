@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { IndianRupee, Calendar, Banknote, CreditCard, Smartphone, Send, MessageSquare, Mail, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { billingService, Bill, DayPaymentSummary } from '@/services/billingService';
+import { sendDaySummary } from '@/services/whatsappService';
 
 export function DayPayments() {
   const { toast } = useToast();
@@ -116,13 +117,31 @@ export function DayPayments() {
 
     setIsSending(true);
     try {
-      await billingService.sendDaySummaryWhatsApp(selectedDate, phoneNumber);
-      toast({
-        title: 'WhatsApp Sent',
-        description: 'Day payments summary PDF sent successfully via WhatsApp.',
-      });
-      setShareDialog(null);
-      setPhoneNumber('');
+      const summaryData = {
+        date: format(new Date(selectedDate), 'dd MMM yyyy'),
+        cashTotal,
+        cardTotal,
+        upiTotal,
+        grandTotal,
+        totalTransactions,
+      };
+
+      const result = await sendDaySummary(phoneNumber, selectedDate, summaryData);
+
+      if (result.success) {
+        toast({
+          title: result.mode === 'LOCAL' ? 'WhatsApp Ready' : 'WhatsApp Sent',
+          description: result.message,
+        });
+        setShareDialog(null);
+        setPhoneNumber('');
+      } else {
+        toast({
+          title: 'WhatsApp Error',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to send WhatsApp';
       toast({ title: 'WhatsApp Error', description: message, variant: 'destructive' });

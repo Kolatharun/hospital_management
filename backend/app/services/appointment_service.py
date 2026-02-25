@@ -216,7 +216,7 @@ class AppointmentService:
         return self.complete_consultation(appointment_id)
 
     def call_patient(self, appointment_id: UUID, room: Optional[str] = None) -> Appointment:
-        """Call patient (waiting → in-progress)."""
+        """Call patient (waiting → calling). TV will transition to in-progress after announcement."""
         appointment = self.get_appointment(appointment_id)
 
         if appointment.status != AppointmentStatus.WAITING:
@@ -229,8 +229,14 @@ class AppointmentService:
         if room:
             self.appointment_repo.update(appointment_id, {"room": room})
 
-        # Update status (also resets announcement_played flag)
-        result = self.appointment_repo.update_status(appointment_id, AppointmentStatus.IN_PROGRESS)
+        # Reset announcement flag and set status to CALLING (not IN_PROGRESS)
+        # TV display will transition to IN_PROGRESS after announcement completes
+        appointment.announcement_played = False
+        appointment.announcement_played_at = None
+        appointment.called_at = datetime.utcnow().isoformat()
+        appointment.status = AppointmentStatus.CALLING
+        self.db.commit()
+        self.db.refresh(appointment)
 
         # Reduce waiting times for remaining waiting patients of this doctor
         if appointment.doctor_id:
@@ -240,7 +246,7 @@ class AppointmentService:
             )
             self.db.commit()
 
-        return result
+        return appointment
 
     def complete_consultation(self, appointment_id: UUID) -> Appointment:
         """Complete consultation (in-progress → completed)."""
@@ -296,6 +302,35 @@ class AppointmentService:
 
         appointment.announcement_played = True
         appointment.announcement_played_at = datetime.utcnow().isoformat()
+        self.db.commit()
+        self.db.refresh(appointment)
+        return appointment
+
+    def complete_announcement(self, appointment_id: UUID) -> Appointment:
+        """
+        Complete announcement and transition to in-progress (calling → in-progress).
+
+        Called by TV display after voice announcement finishes.
+        Atomically sets announcement_played=True and status=IN_PROGRESS.
+        Multi-TV safe: only first caller succeeds, others get current state.
+        """
+        appointment = self.get_appointment(appointment_id)
+
+        # If already in-progress or beyond, return current state (idempotent)
+        if appointment.status in [AppointmentStatus.IN_PROGRESS, AppointmentStatus.COMPLETED]:
+            return appointment
+
+        # Only transition from CALLING status
+        if appointment.status != AppointmentStatus.CALLING:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot complete announcement for appointment with '{appointment.status.value}' status",
+            )
+
+        # Atomic update: mark announced + transition to in-progress
+        appointment.announcement_played = True
+        appointment.announcement_played_at = datetime.utcnow().isoformat()
+        appointment.status = AppointmentStatus.IN_PROGRESS
         self.db.commit()
         self.db.refresh(appointment)
         return appointment

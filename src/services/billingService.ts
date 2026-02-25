@@ -186,6 +186,11 @@ export const billingService = {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
     return `${baseUrl}/billing/${billId}/receipt-pdf`;
   },
+
+  getDaySummaryPdfUrl(targetDate: string): string {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    return `${baseUrl}/billing/summary/pdf?target_date=${targetDate}`;
+  },
 };
 
 export default billingService;

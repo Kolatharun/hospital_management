@@ -308,3 +308,30 @@ def mark_announcement_played(
     service = AppointmentService(db)
     appointment = service.mark_announcement_played(appointment_id)
     return service.build_response(appointment)
+
+
+@router.post("/{appointment_id}/complete-announcement", response_model=AppointmentResponse)
+async def complete_announcement(
+    appointment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Complete announcement and transition to in-progress (calling → in-progress).
+
+    Called by TV display after voice announcement finishes successfully.
+    Atomically sets announcement_played=True and status=IN_PROGRESS.
+    Multi-TV safe: only first caller succeeds, subsequent calls return current state.
+    """
+    service = AppointmentService(db)
+    appointment = service.complete_announcement(appointment_id)
+    response = service.build_response(appointment)
+
+    # Emit Socket.IO event for real-time updates
+    doctor_id = str(appointment.doctor_id) if appointment.doctor_id else None
+    await socket_manager.emit_queue_updated(
+        doctor_id=doctor_id,
+        data={"action": "announcement_completed", "appointment_id": str(appointment.id)}
+    )
+
+    return response

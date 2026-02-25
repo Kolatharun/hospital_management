@@ -18,8 +18,8 @@ CONSULTATION_TIME_MINUTES = 15
 BUFFER_TIME_MINUTES = 0
 
 # Configurable: Minutes to reduce from waiting patients when a patient is called
-# This is the assumed consultation time per patient
-REDUCE_MINUTES_ON_CALL = 15
+# This accounts for average consultation progress, keeping next patient ETA > 0
+REDUCE_MINUTES_ON_CALL = 10
 
 
 class AppointmentRepository(BaseRepository[Appointment]):

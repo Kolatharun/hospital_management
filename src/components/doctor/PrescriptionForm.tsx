@@ -21,6 +21,7 @@ import documentService from '@/services/documentService';
 import prescriptionService from '@/services/prescriptionService';
 import masterDataService, { Complaint, Diagnosis, LabTest, Medicine as MedicineMaster } from '@/services/masterDataService';
 import doctorService, { DoctorProfile } from '@/services/doctorService';
+import whatsappService from '@/services/whatsappService';
 import type { Document as PatientDocument } from '@/services/documentService';
 import { DocumentViewer } from './DocumentViewer';
 
@@ -662,12 +663,22 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
 
     try {
       if (method === 'whatsapp') {
-        // Send via backend WhatsApp API
-        await prescriptionService.sendWhatsApp(savedPrescriptionId, patient!.phone!);
-        toast({
-          title: 'WhatsApp Sent',
-          description: `Prescription sent to ${patient!.firstName} via WhatsApp successfully.`,
-        });
+        // Use hybrid WhatsApp service (LOCAL or META mode)
+        const result = await whatsappService.sendPrescriptionToPatient(
+          savedPrescriptionId,
+          patient!.phone!,
+          `${patient!.firstName} ${patient!.lastName}`,
+          formatOPNumber()
+        );
+
+        if (result.success) {
+          toast({
+            title: result.mode === 'LOCAL' ? 'WhatsApp Ready' : 'WhatsApp Sent',
+            description: result.message,
+          });
+        } else {
+          throw new Error(result.message);
+        }
       } else {
         // Send via backend Email SMTP
         await prescriptionService.sendEmail(savedPrescriptionId, patient!.email!);
@@ -706,8 +717,23 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         await prescriptionService.sendToLabEmail(savedPrescriptionId);
         toast({ title: 'Email Sent to Lab', description: 'Prescription sent to lab via email.' });
       } else if (method === 'whatsapp') {
-        await prescriptionService.sendToLabWhatsApp(savedPrescriptionId);
-        toast({ title: 'WhatsApp Sent to Lab', description: 'Prescription sent to lab via WhatsApp.' });
+        // Use hybrid WhatsApp service
+        const labPhone = import.meta.env.VITE_LAB_PHONE || '';
+        const result = await whatsappService.sendPrescriptionToLab(
+          savedPrescriptionId,
+          labPhone,
+          `${patient!.firstName} ${patient!.lastName}`,
+          formatOPNumber()
+        );
+
+        if (result.success) {
+          toast({
+            title: result.mode === 'LOCAL' ? 'WhatsApp Ready' : 'WhatsApp Sent to Lab',
+            description: result.message,
+          });
+        } else {
+          throw new Error(result.message);
+        }
       } else if (method === 'queue') {
         const labTestsList = labTests.split(',').map(t => t.trim()).filter(Boolean);
         await addToLabQueue({
@@ -747,8 +773,23 @@ export const PrescriptionForm = forwardRef<PrescriptionFormRef, PrescriptionForm
         await prescriptionService.sendToPharmacyEmail(savedPrescriptionId);
         toast({ title: 'Email Sent to Pharmacy', description: 'Prescription sent to pharmacy via email.' });
       } else if (method === 'whatsapp') {
-        await prescriptionService.sendToPharmacyWhatsApp(savedPrescriptionId);
-        toast({ title: 'WhatsApp Sent to Pharmacy', description: 'Prescription sent to pharmacy via WhatsApp.' });
+        // Use hybrid WhatsApp service
+        const pharmacyPhone = import.meta.env.VITE_PHARMACY_PHONE || '';
+        const result = await whatsappService.sendPrescriptionToPharmacy(
+          savedPrescriptionId,
+          pharmacyPhone,
+          `${patient!.firstName} ${patient!.lastName}`,
+          formatOPNumber()
+        );
+
+        if (result.success) {
+          toast({
+            title: result.mode === 'LOCAL' ? 'WhatsApp Ready' : 'WhatsApp Sent to Pharmacy',
+            description: result.message,
+          });
+        } else {
+          throw new Error(result.message);
+        }
       } else if (method === 'queue') {
         const medicineNames = medicines.map(m => m.name);
         if (manualMedicines.trim()) {

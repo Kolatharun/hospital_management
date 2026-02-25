@@ -60,7 +60,7 @@ export interface Appointment {
   doctorName: string;
   date: string;
   time: string;
-  status: 'waiting' | 'in-progress' | 'completed' | 'cancelled';
+  status: 'waiting' | 'calling' | 'in-progress' | 'completed' | 'cancelled';
   waitingTime?: number;
   bufferTime?: number;
   etaStartedAt?: string;
@@ -556,15 +556,21 @@ export function ClinicDataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateAppointmentStatus = async (id: string, status: Appointment['status']) => {
-    if (status === 'in-progress') {
-      await appointmentService.callPatient(id);
+    let actualStatus = status;
+
+    if (status === 'calling' || status === 'in-progress') {
+      // Doctor calls patient -> backend sets status to 'calling'
+      // TV will transition to 'in-progress' after announcement completes
+      const response = await appointmentService.callPatient(id);
+      actualStatus = response.status as Appointment['status'];
     } else if (status === 'completed') {
       await appointmentService.completeAppointment(id);
     } else if (status === 'cancelled') {
       await appointmentService.cancelAppointment(id);
     }
+
     setAppointments(prev =>
-      prev.map(apt => (apt.id === id ? { ...apt, status } : apt))
+      prev.map(apt => (apt.id === id ? { ...apt, status: actualStatus } : apt))
     );
   };
 

@@ -13,6 +13,7 @@ export { queueService } from './queueService';
 export { doctorService } from './doctorService';
 export { departmentService } from './departmentService';
 export { documentService } from './documentService';
+export { default as whatsappService } from './whatsappService';
 
 // Re-export types
 export type { LoginRequest, LoginResponse, User } from './authService';
@@ -25,3 +26,4 @@ export type { LabQueueItem, LabQueueCreate, PharmacyQueueItem, PharmacyQueueCrea
 export type { PatientHistory, TodaySummary } from './doctorService';
 export type { Department, Doctor, DoctorsByDepartment } from './departmentService';
 export type { Document, DocumentCreate, DocumentListResponse, TodayDocumentsResponse } from './documentService';
+export type { WhatsAppMode, WhatsAppSendResult } from './whatsappService';

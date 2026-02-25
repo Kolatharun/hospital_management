@@ -349,7 +349,7 @@ export function DocumentUpload() {
     <div className="medical-section space-y-6">
       <div className="flex items-center gap-2">
         <FileText className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-semibold text-primary">Document Upload</h2>
+        <h2 className="text-xl font-semibold text-primary">Patient Reports</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -358,7 +358,7 @@ export function DocumentUpload() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Upload className="w-4 h-4" />
-              Upload Documents
+              Upload Reports
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -432,7 +432,7 @@ export function DocumentUpload() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Document Type <span className="text-destructive">*</span></Label>
+                  <Label>Report Type <span className="text-destructive">*</span></Label>
                   <Select value={documentType} onValueChange={(value) => {
                     setDocumentType(value);
                     setSelectedFiles([]);
@@ -581,7 +581,7 @@ export function DocumentUpload() {
                 {/* Patient's Documents */}
                 {patientDocuments.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Uploaded Documents ({patientDocuments.length})</Label>
+                    <Label>Uploaded Reports ({patientDocuments.length})</Label>
                     <div className="max-h-48 overflow-y-auto space-y-2">
                       {patientDocuments.map(doc => (
                         <div
@@ -641,7 +641,7 @@ export function DocumentUpload() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <FileText className="w-4 h-4" />
-              Today's Uploads
+              Patients Reports
               <Badge className="ml-2">{documents.length}</Badge>
             </CardTitle>
           </CardHeader>

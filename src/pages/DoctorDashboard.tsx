@@ -82,12 +82,15 @@ export default function DoctorDashboard() {
 
   const todayAppointments = getTodayAppointments();
   const waitingCount = todayAppointments.filter(a => a.status === 'waiting').length;
-  const inProgressAppointment = todayAppointments.find(a => a.status === 'in-progress');
+  // Include both 'calling' and 'in-progress' as the current patient
+  const inProgressAppointment = todayAppointments.find(a => a.status === 'in-progress' || a.status === 'calling');
 
   const getStatusBadge = (status: Appointment['status']) => {
     switch (status) {
       case 'waiting':
         return <Badge className="bg-warning/20 text-warning border-warning/30">Waiting</Badge>;
+      case 'calling':
+        return <Badge className="bg-destructive/20 text-destructive border-destructive/30">Calling</Badge>;
       case 'in-progress':
         return <Badge className="bg-primary/20 text-primary border-primary/30">In Consultation</Badge>;
       case 'completed':
@@ -97,12 +100,14 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Sort appointments: Waiting first, then In Consultation, then Completed
+  // Sort appointments: Calling/In-Progress first, then Waiting, then Completed
   const getStatusPriority = (status: Appointment['status']): number => {
     switch (status) {
-      case 'waiting':
+      case 'calling':
         return 1;
       case 'in-progress':
+        return 1;
+      case 'waiting':
         return 2;
       case 'completed':
         return 3;
@@ -287,7 +292,7 @@ export default function DoctorDashboard() {
                       {sortedAppointments.map((appointment) => (
                         <TableRow
                           key={appointment.id}
-                          className={`hover:bg-muted/50 ${appointment.status === 'in-progress' ? 'bg-primary/5' : ''}`}
+                          className={`hover:bg-muted/50 ${(appointment.status === 'calling' || appointment.status === 'in-progress') ? 'bg-primary/5' : ''}`}
                         >
                           <TableCell className="font-mono text-sm">
                             {appointment.opNumber || `OP-${appointment.tokenNumber}`}
@@ -328,7 +333,7 @@ export default function DoctorDashboard() {
                                   </Button>
                                 </>
                               )}
-                              {appointment.status === 'in-progress' && (
+                              {(appointment.status === 'calling' || appointment.status === 'in-progress') && (
                                 <>
                                   <Button
                                     size="sm"

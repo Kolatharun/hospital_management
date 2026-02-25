@@ -2,6 +2,21 @@ import { useCallback, useRef } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+const digitToWordEnglish: Record<string, string> = {
+  '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+  '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'
+};
+
+const digitToWordTelugu: Record<string, string> = {
+  '0': 'సున్న', '1': 'ఒకటి', '2': 'రెండు', '3': 'మూడు', '4': 'నాలుగు',
+  '5': 'ఐదు', '6': 'ఆరు', '7': 'ఏడు', '8': 'ఎనిమిది', '9': 'తొమ్మిది'
+};
+
+const digitsToWords = (str: string, language: 'telugu' | 'english' = 'english'): string => {
+  const map = language === 'telugu' ? digitToWordTelugu : digitToWordEnglish;
+  return str.split('').map(char => map[char] || char).join(' ');
+};
+
 export function useVoiceAnnouncement() {
   const isAnnouncingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -88,8 +103,9 @@ export function useVoiceAnnouncement() {
     isAnnouncingRef.current = true;
     console.log('[TTS] Starting announcement for:', opNumber, patientName);
 
-    const teluguText = `ఓపీ నంబర్ ${opNumber}, పేరు ${patientName}, దయచేసి రూమ్ నెంబర్ ${roomNumber} కి వెళ్లండి.`;
-    const englishText = `O P number ${opNumber}, name ${patientName}, please proceed to room number ${roomNumber}.`;
+    const opNumberShort = opNumber.split('-').pop() || opNumber;
+    const teluguText = `ఓపీ నంబర్ ${digitsToWords(opNumberShort, 'telugu')}, పేరు ${patientName}, దయచేసి రూమ్ నెంబర్ ${roomNumber} కి వెళ్లండి.`;
+    const englishText = `O P number ${digitsToWords(opNumberShort, 'english')}, name ${patientName}, please proceed to room number ${roomNumber}.`;
 
     try {
       await speak(teluguText, 'telugu');

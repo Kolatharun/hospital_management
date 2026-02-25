@@ -45,11 +45,13 @@ class AppointmentStatus(str, enum.Enum):
 
     State transitions:
     - waiting: Initial state when appointment is created
-    - in-progress: Doctor has called the patient
+    - calling: Doctor clicked Call, TV is playing announcement
+    - in-progress: Announcement completed, consultation in progress
     - completed: Consultation finished
     - cancelled: Appointment cancelled
     """
     WAITING = "waiting"
+    CALLING = "calling"
     IN_PROGRESS = "in-progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"

@@ -933,7 +933,7 @@ export function VitalsCollection() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Activity className="w-4 h-4" />
-                Today's Vitals
+                Patient Vitals
                 <Badge className="ml-2">{vitalsRecords.length}</Badge>
               </CardTitle>
               {vitalsRecords.length > 0 && (

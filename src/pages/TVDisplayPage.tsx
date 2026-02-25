@@ -47,10 +47,10 @@ export default function TVDisplayPage() {
 
   // Voice announcement effect - uses backend tracking (refresh-safe, multi-TV safe)
   useEffect(() => {
-    // Find a patient who needs announcement: status is 'calling' or 'in-progress' but not yet announced
-    // We check both statuses because 'calling' can quickly change to 'in-progress'
+    // Find a patient who needs announcement: status must be 'calling' and not yet announced
+    // Only 'calling' status triggers announcements - backend sets this when doctor clicks Call
     const patientNeedingAnnouncement = todayAppointments.find(
-      apt => ((apt.status as string) === 'calling' || apt.status === 'in-progress') &&
+      apt => (apt.status as string) === 'calling' &&
              !apt.announcementPlayed &&
              !triggeredAnnouncementsRef.current.has(apt.id)
     );
@@ -60,13 +60,12 @@ export default function TVDisplayPage() {
       return;
     }
 
-    // If no patient needs announcement, just return (don't clear interval - it manages itself)
+    // If no patient needs announcement, just return
     if (!patientNeedingAnnouncement) {
       return;
     }
 
     // Capture patient info at trigger time - announcement will complete with these values
-    // regardless of any subsequent status changes
     const appointmentId = patientNeedingAnnouncement.id;
     const opNumber = patientNeedingAnnouncement.opNumber || `OP-${patientNeedingAnnouncement.tokenNumber}`;
     const patientName = `${patientNeedingAnnouncement.patient.firstName} ${patientNeedingAnnouncement.patient.lastName}`;
@@ -76,15 +75,22 @@ export default function TVDisplayPage() {
     currentlyAnnouncingIdRef.current = appointmentId;
     setIsAnnouncing(true);
 
-    // Start announcement - only mark as played AFTER voice completes successfully
+    // Start announcement - complete announcement AFTER voice finishes successfully
+    // This atomically sets announcement_played=true AND status=in-progress
     announcePatientCall(opNumber, patientName, roomNumber)
       .then(() => {
-        // Voice played successfully - now mark as announced in backend
-        console.log('[Announcement] Voice completed, marking as played:', appointmentId);
+        // Voice played successfully - complete announcement (calling → in-progress)
+        console.log('[Announcement] Voice completed, completing announcement:', appointmentId);
         triggeredAnnouncementsRef.current.add(appointmentId);
-        return appointmentService.markAnnouncementPlayed(appointmentId);
+        return appointmentService.completeAnnouncement(appointmentId);
       })
-      .then(() => refreshAppointments())
+      .then(() => {
+        // Refresh to get updated status from backend
+        return refreshAppointments();
+      })
+      .then(() => {
+        setRefreshKey(prev => prev + 1);
+      })
       .catch((error) => {
         // If skipped due to concurrent announcement, don't add to triggered set (allow retry)
         if (error?.message === 'ANNOUNCEMENT_SKIPPED') {
@@ -131,7 +137,7 @@ export default function TVDisplayPage() {
   };
 
   const getStatusText = (status: string, index: number) => {
-    if (status === 'in-progress') return 'Calling';
+    if (status === 'in-progress') return 'In Progress';
     if (status === 'calling') return 'Calling';
     if (index === 1) return 'Next';
     return 'Waiting';

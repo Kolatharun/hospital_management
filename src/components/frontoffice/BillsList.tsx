@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import billingService, { Bill as ApiBill } from '@/services/billingService';
+import { sendBillToPatient } from '@/services/whatsappService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -441,13 +442,27 @@ export function BillsList() {
 
     setIsSending(true);
     try {
-      await billingService.sendWhatsApp(bill.id, phoneNumber);
-      toast({
-        title: 'WhatsApp Sent',
-        description: 'Bill receipt PDF sent successfully via WhatsApp.',
-      });
-      setShareDialog(null);
-      setPhoneNumber('');
+      const result = await sendBillToPatient(
+        bill.id,
+        phoneNumber,
+        bill.patientName,
+        bill.billNumber
+      );
+
+      if (result.success) {
+        toast({
+          title: result.mode === 'LOCAL' ? 'WhatsApp Ready' : 'WhatsApp Sent',
+          description: result.message,
+        });
+        setShareDialog(null);
+        setPhoneNumber('');
+      } else {
+        toast({
+          title: 'WhatsApp Error',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to send WhatsApp';
       toast({
