@@ -53,6 +53,8 @@ coverage.xml
 # Environments
 .env
 
+.claude
+
 env/
 venv/
 ENV/
@@ -87,3 +89,6 @@ uploads/documents/
 
 # Ignore generated prescription PDFs/images
 uploads/prescriptions/
+
+
+backend/venv/
