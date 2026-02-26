@@ -24,7 +24,7 @@ export default function TVDisplayPage() {
     };
   }, [stopAudio]);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 5 seconds
   useEffect(() => {
     const timeInterval = setInterval(() => {
       setCurrentTime(new Date());
@@ -32,7 +32,7 @@ export default function TVDisplayPage() {
 
     const refreshInterval = setInterval(() => {
       setRefreshKey(prev => prev + 1);
-    }, 30000);
+    }, 5000);
 
     return () => {
       clearInterval(timeInterval);

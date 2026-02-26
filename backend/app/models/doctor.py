@@ -152,38 +152,3 @@ class Doctor(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Doctor(id={self.id}, name={self.name}, department={self.department_id})>"
-
-
-# Default doctors from frontend (for seeding)
-DEFAULT_DOCTORS = [
-    {
-        "name": "Dr. R. Balaji",
-        "speciality": "Cardiology",
-        "qualification": "MBBS, MD, DM (Cardiology)",
-        "room": "101",
-    },
-    {
-        "name": "Dr. Priya Sharma",
-        "speciality": "Cardiology",
-        "qualification": "MBBS, MD, DM (Cardiology)",
-        "room": "102",
-    },
-    {
-        "name": "Dr. Rajesh Kumar",
-        "speciality": "General Medicine",
-        "qualification": "MBBS, MD (Medicine)",
-        "room": "201",
-    },
-    {
-        "name": "Dr. Lakshmi Devi",
-        "speciality": "Pediatrics",
-        "qualification": "MBBS, MD (Pediatrics)",
-        "room": "301",
-    },
-    {
-        "name": "Dr. Suresh Reddy",
-        "speciality": "Dermatology",
-        "qualification": "MBBS, MD (Dermatology)",
-        "room": "401",
-    },
-]

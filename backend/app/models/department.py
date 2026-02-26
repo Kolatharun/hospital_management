@@ -68,18 +68,3 @@ class Department(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Department(id={self.id}, name={self.name}, fee={self.base_consultation_fee})>"
-
-
-# Default departments from frontend PatientRegistration.tsx
-DEFAULT_DEPARTMENTS = [
-    {"name": "Cardiology", "code": "CARD", "base_consultation_fee": Decimal("500.00")},
-    {"name": "General Medicine", "code": "GENM", "base_consultation_fee": Decimal("300.00")},
-    {"name": "Orthopedics", "code": "ORTH", "base_consultation_fee": Decimal("400.00")},
-    {"name": "Pediatrics", "code": "PEDI", "base_consultation_fee": Decimal("350.00")},
-    {"name": "Dermatology", "code": "DERM", "base_consultation_fee": Decimal("400.00")},
-    {"name": "ENT", "code": "ENT", "base_consultation_fee": Decimal("350.00")},
-    {"name": "Ophthalmology", "code": "OPHT", "base_consultation_fee": Decimal("400.00")},
-    {"name": "Gynecology", "code": "GYNE", "base_consultation_fee": Decimal("450.00")},
-    {"name": "Neurology", "code": "NEUR", "base_consultation_fee": Decimal("600.00")},
-    {"name": "Gastroenterology", "code": "GAST", "base_consultation_fee": Decimal("500.00")},
-]

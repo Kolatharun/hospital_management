@@ -31,7 +31,7 @@ class LoginRequest(BaseModel):
         min_length=3,
         max_length=255,
         description="Username or email for authentication",
-        examples=["frontoffice", "user@example.com"],
+        examples=["your_username", "user@example.com"],
     )
 
     password: str = Field(
@@ -44,8 +44,8 @@ class LoginRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "username_or_email": "frontoffice",
-                "password": "front123",
+                "username_or_email": "your_username",
+                "password": "your_password",
             }
         }
 

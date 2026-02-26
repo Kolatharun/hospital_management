@@ -7,7 +7,6 @@ It will:
 1. Check PostgreSQL connection
 2. Create the database if it doesn't exist
 3. Run Alembic migrations
-4. Seed demo data
 
 Usage:
     python scripts/setup_db.py
@@ -159,12 +158,10 @@ def main():
     print("\n" + "=" * 60)
     print("✓ Database setup completed successfully!")
     print("=" * 60)
-    print("\nDemo Credentials:")
-    print("  Front Office: frontoffice / front123")
-    print("  Doctor: doctor / doctor123")
     print("\nNext steps:")
-    print("  1. Start the server: uvicorn app.main:app --reload")
-    print("  2. Open API docs: http://localhost:8000/docs")
+    print("  1. Create admin user: python scripts/create_admin.py")
+    print("  2. Start the server: uvicorn app.main:app --reload")
+    print("  3. Open API docs: http://localhost:8000/docs")
 
 
 if __name__ == "__main__":

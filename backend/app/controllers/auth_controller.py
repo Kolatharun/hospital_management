@@ -65,10 +65,6 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     **Frontend mapping:** LoginPage.tsx form submission
 
     Returns JWT access and refresh tokens along with user information.
-
-    **Demo credentials:**
-    - Front Office: username=`frontoffice`, password=`front123`
-    - Doctor: username=`doctor`, password=`doctor123`
     """,
     responses={
         200: {"description": "Login successful"},

@@ -11,8 +11,8 @@ from app.models.base import BaseModel
 from app.models.user import User, UserRole
 
 # Master data
-from app.models.department import Department, DEFAULT_DEPARTMENTS
-from app.models.doctor import Doctor, DEFAULT_DOCTORS
+from app.models.department import Department
+from app.models.doctor import Doctor
 
 # Patient
 from app.models.patient import Patient, Gender, MaritalStatus, PatientType
@@ -53,9 +53,7 @@ __all__ = [
     "UserRole",
     # Master
     "Department",
-    "DEFAULT_DEPARTMENTS",
     "Doctor",
-    "DEFAULT_DOCTORS",
     # Patient
     "Patient",
     "Gender",

@@ -59,7 +59,7 @@ htmlcov/
 backend/uploads/
 
 # Google Cloud credentials
-*.json
+# *.json
 !package.json
 !package-lock.json
 !tsconfig*.json

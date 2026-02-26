@@ -86,11 +86,6 @@ Backend API for the Balaji Heart Center Hospital Management System.
 - **Front Office**: Access to registration, billing, vitals, queue management
 - **Doctor**: Access to prescriptions, consultations, patient queue
 
-### Demo Credentials
-- **Admin**: username=`admin`, password=`admin123`
-- **Front Office**: username=`frontoffice`, password=`front123`
-- **Doctor**: username=`doctor`, password=`doctor123`
-
 ### API Versioning
 All endpoints are prefixed with `/api/v1`
     """,
