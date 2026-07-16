@@ -67,3 +67,4 @@ backend/uploads/
 
 # OS files
 Thumbs.db
+backend/google-tts-key.json
