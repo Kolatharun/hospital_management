@@ -1,0 +1,43 @@
+/* Base Resets & Global Application Shell */
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+/* App Centered Desktop Shell */
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background-color: #EBF1F2;
+}
+
+.mobile-shell {
+  width: 100%;
+  max-width: var(--max-app-width);
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+  overflow-x: hidden;
+}
+
+/* Safe areas */
+.safe-padding-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
