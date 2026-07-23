@@ -1,0 +1,28 @@
+/* Custom Utility Classes */
+.touch-target {
+  min-height: var(--min-touch-target);
+  min-width: var(--min-touch-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-radius {
+  border-radius: var(--radius-card);
+}
+
+.input-radius {
+  border-radius: var(--radius-input);
+}
+
+.button-radius {
+  border-radius: var(--radius-button);
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

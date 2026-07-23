@@ -1,0 +1,58 @@
+import { Doctor, TimeSlot } from '../types';
+
+export const mockDoctors: Doctor[] = [
+  {
+    id: 'doc-1',
+    name: 'Dr. Ananya Rao',
+    speciality: 'Senior Interventional Cardiologist',
+    qualification: 'MD, DM (Cardiology), FACC',
+    experienceYears: 16,
+    languages: ['English', 'Hindi', 'Marathi'],
+    department: 'Cardiology',
+    roomNumber: 'OPD Room 104',
+    avatarUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+    consultationTypes: ['new', 'review'],
+    availableDays: ['Today', 'Tomorrow', 'Friday', 'Saturday'],
+    nextAvailableSlot: 'Today, 10:30 AM',
+    bio: 'Dr. Ananya Rao is a leading interventional cardiologist with over 16 years of experience in managing complex coronary artery disease, heart failure, and preventive cardiac care.',
+  },
+  {
+    id: 'doc-2',
+    name: 'Dr. Vikramaditya Mehta',
+    speciality: 'Electrophysiologist & Cardiologist',
+    qualification: 'MBBS, MD, DNB (Cardiology)',
+    experienceYears: 12,
+    languages: ['English', 'Hindi', 'Gujarati'],
+    department: 'Cardiology',
+    roomNumber: 'OPD Room 106',
+    avatarUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300',
+    consultationTypes: ['new', 'review'],
+    availableDays: ['Today', 'Tomorrow', 'Monday'],
+    nextAvailableSlot: 'Today, 11:45 AM',
+    bio: 'Specialist in arrhythmia management, cardiac pacemakers, and catheter ablation with clinical excellence.',
+  },
+  {
+    id: 'doc-3',
+    name: 'Dr. Sunita Deshmukh',
+    speciality: 'Preventive Cardiac Specialist',
+    qualification: 'MD (Internal Medicine), Fellowship Cardiac Rehab',
+    experienceYears: 9,
+    languages: ['English', 'Marathi', 'Hindi'],
+    department: 'Preventive Cardiology',
+    roomNumber: 'OPD Room 108',
+    avatarUrl: 'https://images.unsplash.com/photo-1594824813570-78988022805a?auto=format&fit=crop&q=80&w=300',
+    consultationTypes: ['new', 'review'],
+    availableDays: ['Tomorrow', 'Friday'],
+    nextAvailableSlot: 'Tomorrow, 09:30 AM',
+    bio: 'Focuses on lipid clinic, hypertension management, and post-angioplasty lifestyle restoration.',
+  },
+];
+
+export const mockTimeSlots: TimeSlot[] = [
+  { id: 'slot-1', doctorId: 'doc-1', date: '2026-07-24', startTime: '09:30 AM', endTime: '09:45 AM', isAvailable: true, type: 'morning' },
+  { id: 'slot-2', doctorId: 'doc-1', date: '2026-07-24', startTime: '10:00 AM', endTime: '10:15 AM', isAvailable: false, type: 'morning' },
+  { id: 'slot-3', doctorId: 'doc-1', date: '2026-07-24', startTime: '10:30 AM', endTime: '10:45 AM', isAvailable: true, type: 'morning' },
+  { id: 'slot-4', doctorId: 'doc-1', date: '2026-07-24', startTime: '11:00 AM', endTime: '11:15 AM', isAvailable: true, type: 'morning' },
+  { id: 'slot-5', doctorId: 'doc-1', date: '2026-07-24', startTime: '04:00 PM', endTime: '04:15 PM', isAvailable: true, type: 'evening' },
+  { id: 'slot-6', doctorId: 'doc-1', date: '2026-07-24', startTime: '04:30 PM', endTime: '04:45 PM', isAvailable: true, type: 'evening' },
+];

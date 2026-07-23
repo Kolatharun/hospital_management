@@ -1,0 +1,43 @@
+:root {
+  /* Color Palette - Balaji Heart Center Design System */
+  --color-primary: #0B6875;
+  --color-primary-dark: #084F59;
+  --color-primary-light: #DFF3F5;
+  --color-bg: #F7F9F8;
+  --color-card: #FFFFFF;
+  --color-text-primary: #16343C;
+  --color-text-secondary: #708188;
+  --color-border: #DCE6E7;
+  --color-success: #23866A;
+  --color-warning: #E9A83A;
+  --color-error: #C94B4B;
+  --color-disabled: #BAC6C9;
+
+  /* Typography */
+  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  
+  /* Radius Tokens */
+  --radius-card: 18px;
+  --radius-input: 14px;
+  --radius-button: 14px;
+  --radius-badge: 8px;
+  --radius-sheet: 24px;
+
+  /* Spacing Tokens */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Touch Target */
+  --min-touch-target: 44px;
+
+  /* Shell Width */
+  --max-app-width: 480px;
+
+  /* Shadows */
+  --shadow-subtle: 0 2px 8px rgba(22, 52, 60, 0.04);
+  --shadow-card: 0 4px 16px rgba(11, 104, 117, 0.06);
+  --shadow-elevated: 0 8px 24px rgba(22, 52, 60, 0.12);
+}
