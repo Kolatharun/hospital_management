@@ -21,5 +21,7 @@ export const useAppNavigation = () => {
     goToNotifications: () => navigate('/notifications'),
     goToProfile: () => navigate('/profile'),
     goToSupport: () => navigate('/support'),
+    goToCareCircle: () => navigate('/care-circle'),
+    goToPatientJourney: (memberId?: string) => navigate(memberId ? `/patient-journey/${memberId}` : '/care-circle'),
   };
 };
