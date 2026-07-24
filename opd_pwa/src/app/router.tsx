@@ -43,6 +43,9 @@ import { NotificationPreferences } from '../pages/profile/NotificationPreference
 import { HelpSupport } from '../pages/support/HelpSupport';
 import { ReportIssue } from '../pages/support/ReportIssue';
 
+import { CareCirclePage } from '../pages/careCircle/CareCirclePage';
+import { PatientJourneyPage } from '../pages/careCircle/PatientJourneyPage';
+
 import { OfflinePage } from '../pages/system/OfflinePage';
 import { SessionExpired } from '../pages/system/SessionExpired';
 import { NotFound } from '../pages/system/NotFound';
@@ -313,6 +316,30 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ReportIssue />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/care-circle',
+        element: (
+          <ProtectedRoute>
+            <CareCirclePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/care-circle/:memberId',
+        element: (
+          <ProtectedRoute>
+            <PatientJourneyPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/patient-journey/:memberId',
+        element: (
+          <ProtectedRoute>
+            <PatientJourneyPage />
           </ProtectedRoute>
         ),
       },

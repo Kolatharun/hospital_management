@@ -1,20 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/uiStore';
 import { appointmentService } from '../../services/appointmentService';
 import { prescriptionService } from '../../services/prescriptionService';
 import { queueService } from '../../services/queueService';
+import { careCircleService } from '../../services/careCircleService';
+import { useCareCircleStore } from '../../store/careCircleStore';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
 import { formatDate } from '../../utils/date';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { HomeEmergencyCard } from '../../components/home/HomeEmergencyCard';
+import { EmergencyHelpSheet } from '../../components/sheets/EmergencyHelpSheet';
+import { CareCircleWidget } from '../../components/home/CareCircleWidget';
+import { AddCareMemberModal } from '../../components/careCircle/AddCareMemberModal';
+import { CareMember } from '../../types';
 
 export const Home: React.FC = () => {
   const { patient } = useAuth();
   const { language, setLanguage } = useUIStore();
   const nav = useAppNavigation();
+  const { activeMemberId, setActiveMemberId, members, setMembers, addMember } = useCareCircleStore();
+
+  const [isEmergencySheetOpen, setIsEmergencySheetOpen] = useState(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+
+  const { data: careMembers } = useQuery({
+    queryKey: ['careMembers'],
+    queryFn: async () => {
+      const data = await careCircleService.getCareMembers();
+      setMembers(data);
+      return data;
+    },
+  });
+
+  const memberList = careMembers || members;
 
   const patientFirstName = patient?.fullName ? patient.fullName.split(' ')[0] : 'Priyanshu';
+
 
   const { data: appointmentsRes } = useQuery({
     queryKey: ['appointments'],
@@ -87,6 +110,12 @@ export const Home: React.FC = () => {
       </header>
 
       <ScreenContainer hasBottomNav={true} className="max-w-7xl mx-auto px-5 py-4 flex flex-col gap-6">
+        {/* Safe Home Emergency Control - Highly Visible & Safe 2-step flow */}
+        <HomeEmergencyCard
+          onOpenEmergencySheet={() => setIsEmergencySheetOpen(true)}
+          isSheetOpen={isEmergencySheetOpen}
+        />
+
         {/* Active Queue Card (Elevated Priority) - Stitch Exact Design */}
         <section className="bg-[#0b6875] text-[#9ae4f3] rounded-[22px] p-5 shadow-[0px_8px_24px_rgba(22,52,60,0.08)] relative overflow-hidden">
           {/* Decorative Background Element */}
@@ -307,6 +336,16 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
+        {/* Care Circle & Family Health Widget */}
+        <CareCircleWidget
+          members={memberList}
+          activeMemberId={activeMemberId}
+          onSelectMember={(id) => setActiveMemberId(id)}
+          onViewJourney={(id) => nav.navigate(`/patient-journey/${id}`)}
+          onManageCareCircle={() => nav.navigate('/care-circle')}
+          onAddMember={() => setIsAddMemberModalOpen(true)}
+        />
+
         {/* Clinic Support Strip - Stitch Exact Design */}
         <section className="bg-[#f1f4f5] rounded-[16px] p-4 flex items-center justify-between border border-[#bec8cb]/20 mb-4">
           <div className="flex flex-col">
@@ -331,6 +370,23 @@ export const Home: React.FC = () => {
           </a>
         </section>
       </ScreenContainer>
+
+      {/* Emergency Help Bottom Sheet */}
+      <EmergencyHelpSheet
+        isOpen={isEmergencySheetOpen}
+        onClose={() => setIsEmergencySheetOpen(false)}
+        careMembers={memberList}
+        activePatientId={activeMemberId}
+        onSelectPatient={(id) => setActiveMemberId(id)}
+      />
+
+      {/* Add Family Member Modal */}
+      <AddCareMemberModal
+        isOpen={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        onSuccess={(newMember: CareMember) => addMember(newMember)}
+      />
     </div>
   );
 };
+
