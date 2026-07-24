@@ -13,12 +13,14 @@ export interface MedicineItem {
   route?: string;
   instructions: string;
   prescribed_qty: number;
+  original_qty?: number;
   available_qty: number;
   unit_price: number;
   stock_status: StockStatus;
   batch_number?: string;
   expiry_date?: string;
   rack_location?: string;
+  adjustment_reason?: string;
   substitute_options?: {
     id: string;
     brand_name: string;
