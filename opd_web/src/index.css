@@ -145,12 +145,15 @@
     @apply text-sm font-medium text-foreground;
   }
 
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     @apply text-base;
   }
 }
 
 @layer components {
+
   /* Medical card styling */
   .medical-card {
     @apply bg-card rounded-lg border border-border shadow-sm;
@@ -237,11 +240,11 @@
     .no-print {
       display: none !important;
     }
-    
+
     body {
       background: white !important;
     }
-    
+
     .print-container {
       padding: 0 !important;
       margin: 0 !important;
@@ -269,6 +272,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -280,9 +284,12 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px hsl(var(--accent));
   }
+
   50% {
     box-shadow: 0 0 20px hsl(var(--accent)), 0 0 30px hsl(var(--accent) / 0.5);
   }
@@ -294,10 +301,13 @@
 
 /* TV Display button blink animation */
 @keyframes blink-tv {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     box-shadow: 0 0 8px #b23438;
   }
+
   50% {
     opacity: 0.7;
     box-shadow: 0 0 20px #b23438, 0 0 30px #b23438;
