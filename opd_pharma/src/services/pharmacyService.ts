@@ -491,6 +491,7 @@ export const pharmacyService = {
   },
 
   async getRequestById(requestId: string): Promise<PrescriptionRequest> {
+    MOCK_QUEUE_REQUESTS = getStoredData(QUEUE_STORAGE_KEY, INITIAL_QUEUE_REQUESTS);
     const item = MOCK_QUEUE_REQUESTS.find((r) => r.id === requestId);
     if (!item) {
       throw new Error(`Pharmacy request ${requestId} not found.`);
@@ -507,8 +508,10 @@ export const pharmacyService = {
       counseling_notes?: string;
       rejection_reason?: string;
       medicines?: any[];
+      total_amount?: number;
     }
   ): Promise<PrescriptionRequest> {
+    MOCK_QUEUE_REQUESTS = getStoredData(QUEUE_STORAGE_KEY, INITIAL_QUEUE_REQUESTS);
     const index = MOCK_QUEUE_REQUESTS.findIndex((r) => r.id === requestId);
     if (index === -1) {
       throw new Error('Request not found');
@@ -516,6 +519,11 @@ export const pharmacyService = {
 
     const current = MOCK_QUEUE_REQUESTS[index];
     const now = new Date().toISOString();
+
+    const medicines = extraData?.medicines || current.medicines;
+    const total_amount = extraData?.total_amount !== undefined
+      ? extraData.total_amount
+      : medicines.reduce((sum, item) => sum + (item.unit_price * (item.prescribed_qty || 0)), 0);
 
     const updated: PrescriptionRequest = {
       ...current,
@@ -527,7 +535,8 @@ export const pharmacyService = {
       counseling_notes: extraData?.counseling_notes || current.counseling_notes,
       rejection_reason: extraData?.rejection_reason || current.rejection_reason,
       dispensed_by: extraData?.dispensed_by || current.dispensed_by || 'Pharmacist Ramesh P.',
-      medicines: extraData?.medicines || current.medicines,
+      medicines: medicines,
+      total_amount: total_amount,
     };
 
     MOCK_QUEUE_REQUESTS[index] = updated;
