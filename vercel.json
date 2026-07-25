@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/opd_amb/(.*)", "destination": "/opd_amb/index.html" },
+    { "source": "/opd_pharma/(.*)", "destination": "/opd_pharma/index.html" },
+    { "source": "/opd_pwa/(.*)", "destination": "/opd_pwa/index.html" },
+    { "source": "/opd_web/(.*)", "destination": "/opd_web/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

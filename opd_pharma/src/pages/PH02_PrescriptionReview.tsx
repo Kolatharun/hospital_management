@@ -22,7 +22,7 @@ import {
   Calculator,
 } from 'lucide-react';
 import { pharmacyService } from '../services/pharmacyService';
-import { PrescriptionRequest, MedicineItem, DrugStockItem } from '../types/pharmacy';
+import { PrescriptionRequest, MedicineItem, DrugStockItem, StockStatus } from '../types/pharmacy';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -199,7 +199,7 @@ export const PH02_PrescriptionReview: React.FC = () => {
   // Apply Substitute
   const handleApplySubstitute = (sub: any, originalMedId: string) => {
     if (!request) return;
-    const updatedMedicines = request.medicines.map((m) => {
+    const updatedMedicines: MedicineItem[] = request.medicines.map((m) => {
       if (m.id === originalMedId) {
         return {
           ...m,
@@ -207,7 +207,7 @@ export const PH02_PrescriptionReview: React.FC = () => {
           generic_name: sub.generic_name,
           unit_price: sub.unit_price,
           available_qty: sub.available_qty,
-          stock_status: (sub.available_qty > 0 ? 'in_stock' : 'out_of_stock') as const,
+          stock_status: (sub.available_qty > 0 ? 'in_stock' : 'out_of_stock') as StockStatus,
           adjustment_reason: `Substituted with ${sub.brand_name}`,
         };
       }
