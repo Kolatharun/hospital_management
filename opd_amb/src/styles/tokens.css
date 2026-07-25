@@ -1,0 +1,22 @@
+:root {
+  /* Standard 8px Spacing System Tokens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Touch & Layout Standards */
+  --min-touch-target: 48px;
+  --header-height: 56px;
+  --bottom-nav-height: 64px;
+
+  /* Mobile Safe Area Inset Support */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
