@@ -207,7 +207,7 @@ export const PH02_PrescriptionReview: React.FC = () => {
           generic_name: sub.generic_name,
           unit_price: sub.unit_price,
           available_qty: sub.available_qty,
-          stock_status: (sub.available_qty > 0 ? 'in_stock' : 'out_of_stock') as const,
+          stock_status: (sub.available_qty > 0 ? 'in_stock' : 'out_of_stock') as 'in_stock' | 'out_of_stock',
           adjustment_reason: `Substituted with ${sub.brand_name}`,
         };
       }
