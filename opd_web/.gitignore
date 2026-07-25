@@ -6,3 +6,5 @@ uploads/documents/
 
 # Ignore generated prescription PDFs/images
 uploads/prescriptions/
+
+.env
